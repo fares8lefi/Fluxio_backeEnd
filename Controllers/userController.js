@@ -16,8 +16,10 @@ module.exports.createUser =async(req,res) =>{
             }
             const {username,password,phone,email}=req.body;
             const code = Math.floor(1000 + Math.random() * 9000);
-            await sendEmailVerificationCode(email, username, code);
-            await userModel.create(
+            console.log("code ====",code)
+            await Promise.all([
+                
+               userModel.create(
                 {
                     username,
                     email,
@@ -26,7 +28,10 @@ module.exports.createUser =async(req,res) =>{
                     code,
                     is_active: false,
                 }
-            )
+            ),
+            sendEmailVerificationCode(email, username, code),
+
+            ])
          res.status(200).json({message :"code has been sent to your email" ,success:true})   
     }catch(err){
         console.log(err);
@@ -49,6 +54,23 @@ module.exports.verifyAccounts=async (req,res)=>{
         res.status(200).json({message:"user verified successfully"})
     }catch(error){
          res.status(500).json({message: error.message})
+    }
+}
+
+module.exports.resendCode=async(req,res)=>{
+    try{
+        const{email}=req.body;
+        const user= await userModel.findOne({email}).select('-password')
+        if(!user){
+            return res.status(404).json({message:"user not found"})
+        }
+        const code = Math.floor(1000 + Math.random() * 9000);
+        user.code = code;
+        await user.save();
+        await sendEmailVerificationCode(email, user.username, code);
+        res.status(200).json({message:"code has been sent to your email" ,success:true})
+    }catch(error){
+        res.status(500).json({message: error.message})
     }
 }
 module.exports.loginUser=async(req, res)=>{
@@ -89,7 +111,7 @@ module.exports.getConnectedUser = async (req, res) => {
             return res.status(404).json({ message: "user not found" });
         }
         
-        const user = await userModel.findById(id);
+        const user = await userModel.findById(id).select('-password');
         
         if (!user) {
             return res.status(404).json({ message: "user not found" });
@@ -118,16 +140,17 @@ module.exports.changePassword = async (req,res)=>{
     try{
         const {currentPassord, newPassword} = req.body;
         const id = req.session.user?._id;
-        console.log(id)
+        
         const change = await userModel.verifPasswordUser(id, currentPassord)
         console.log(change)
         if (change) {
           const salt = await bcrypt.genSalt();
           
           const hashedPassword = await bcrypt.hash(newPassword, salt)
-          const update = await userModel.findByIdAndUpdate(id, {
+         await userModel.findByIdAndUpdate(id, {
             password: hashedPassword
           })
+
           return res.status(200).json({
             success: true,
             message: "Password updated successfully"
@@ -192,9 +215,9 @@ module.exports.updateUserStatus= async function (req , res){
 
 }
 
-module.exports.getAllUsers =async function (req , res) {
+module.exports.getAllUsers =async function (res) {
     try{
-        const users = await userModel.find().select("-password");
+        const users = await userModel.find().select("-password","-code");
         res.status(200).json({success: true,users})
     }catch(error){
         res.status(500).json({success: false, message: error.message})

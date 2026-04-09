@@ -5,11 +5,11 @@ const transporter =nodemailer.createTransport({
     service:"gmail",
     auth:{
         user:process.env.EmailUser,
-        password:process.env.password
+        pass:process.env.EmailPassword
     }
 })
  
-const htmlTemplate = `<!DOCTYPE html>
+const htmlTemplate = (username, otpDigits) => `<!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
@@ -46,7 +46,7 @@ const htmlTemplate = `<!DOCTYPE html>
     overflow: hidden;
   }
   .card-bar {
-    height: 4px;
+    height: 4px; 
     background: linear-gradient(90deg, #1D4ED8 0%, #06B6D4 50%, #0D9488 100%);
   }
   .card-body { padding: 44px 48px 40px; }
@@ -158,7 +158,7 @@ const htmlTemplate = `<!DOCTYPE html>
  
       <h1 class="card-title">Vérifiez votre compte</h1>
       <p class="card-subtitle">
-        Bonjour <strong>${username}</strong> 👋<br>
+        Bonjour <strong>${username}</strong> <br>
         Entrez le code ci-dessous pour confirmer votre adresse email et activer votre compte Fluxio.
       </p>
  
@@ -176,14 +176,14 @@ const htmlTemplate = `<!DOCTYPE html>
       <hr class="divider">
  
       <div class="warning-box">
-        <span style="font-size:16px;flex-shrink:0">⚠️</span>
+        <span style="font-size:16px;flex-shrink:0"></span>
         <p class="warning-text">
           <strong>Ne partagez jamais ce code.</strong> L'équipe Fluxio ne vous demandera jamais votre code de vérification par email, téléphone ou messagerie.
         </p>
       </div>
  
       <div class="info-box">
-        <span style="font-size:16px;flex-shrink:0">ℹ️</span>
+        <span style="font-size:16px;flex-shrink:0"></span>
         <p class="info-text">
           Vous n'avez pas créé de compte sur Fluxio ? Ignorez simplement cet email, aucune action n'est requise.
           Pour toute question : <a href="mailto:support@fluxio.io">support@fluxio.io</a>
@@ -215,6 +215,7 @@ const htmlTemplate = `<!DOCTYPE html>
 </html>`;
 const sendEmailVerificationCode=async(email, username, code)=>{
     try{
+        const otpDigits = String(code).split('').map((digit, index) => `<div class="otp-digit ${index === 0 ? 'accent' : ''}">${digit}</div>`).join('');
         const mailOptions={
             from:process.env.EmailUser,
             to:email,
@@ -226,7 +227,7 @@ const sendEmailVerificationCode=async(email, username, code)=>{
                     Cordialement,
                     L'équipe Fluxio
                     © 2026 Fluxio. Tous droits réservés.`,
-                    html:htmlTemplate    
+                    html:htmlTemplate(username, otpDigits)    
         }
         await transporter.sendMail(mailOptions);
         console.log("Email sent successfully");
@@ -238,6 +239,7 @@ const sendEmailVerificationCode=async(email, username, code)=>{
 const sendEmailResetCode=async(email, username, code)=>{
     try{
         
+        const otpDigits = String(code).split('').map((digit, index) => `<div class="otp-digit ${index === 0 ? 'accent' : ''}">${digit}</div>`).join('');
         const mailOptions={
             from:process.env.EmailUser,
             to:email,
@@ -249,8 +251,9 @@ const sendEmailResetCode=async(email, username, code)=>{
                     Cordialement,
                     L'équipe Fluxio
                     © 2026 Fluxio. Tous droits réservés.`,    
-                    html:htmlTemplate    
+                    html:htmlTemplate(username, otpDigits)    
         }
+        console.log("prepare email")
         await transporter.sendMail(mailOptions);
         console.log("Email sent successfully");
     }catch(error){

@@ -73,9 +73,9 @@ module.exports.resendCode=async(req,res)=>{
         res.status(500).json({message: error.message})
     }
 }
-module.exports.foorgetPassword=async(req,res)=>{
+module.exports.foorgetPasswordVerifyCode=async(req,res)=>{
     try{
-        const email =req.body;
+        const {email , newPassword}=req.body;
         const user= await userModel.find({email}).select("-password")
         if(!user){
             res.status(500).json({message: error.message})
@@ -84,11 +84,19 @@ module.exports.foorgetPassword=async(req,res)=>{
         user.code=code
         await user.save()
         await sendEmailResetCode(email,user.username,code)
-        res.status(200).json({message:"code has been sent to your email" ,success:true})
+        const salt = await bcrypt.genSalt();
+          
+          const hashedPassword = await bcrypt.hash(newPassword, salt)
+         await userModel.findByIdAndUpdate(id, {
+            password: hashedPassword
+          })
+        res.status(200).json({message:"password has been changed successfully" ,success:true})
     }catch(error){
         res.status(500).json({message: error.message})
     }
 }
+
+
 module.exports.loginUser=async(req, res)=>{
    try{ 
     
@@ -154,9 +162,8 @@ module.exports.logOutUser = async (res) => {
 
 module.exports.changePassword = async (req,res)=>{
     try{
-        const {currentPassord, newPassword} = req.body;
+        const {currentPassord, newPassword ,code} = req.body;
         const id = req.session.user?._id;
-        
         const change = await userModel.verifPasswordUser(id, currentPassord)
         console.log(change)
         if (change) {

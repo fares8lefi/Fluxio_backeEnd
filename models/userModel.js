@@ -29,6 +29,10 @@ const userSchema = new mongoose.Schema(
             enum : ['user', 'admin'],
             default : 'user',
         },
+        code:{
+            type : Number,
+            required : false,
+        },
         is_active: {
             type : Boolean,
             default : 'false',

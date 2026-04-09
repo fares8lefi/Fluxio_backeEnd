@@ -73,6 +73,22 @@ module.exports.resendCode=async(req,res)=>{
         res.status(500).json({message: error.message})
     }
 }
+module.exports.foorgetPassword=async(req,res)=>{
+    try{
+        const email =req.body;
+        const user= await userModel.find({email}).select("-password")
+        if(!user){
+            res.status(500).json({message: error.message})
+        }
+        const code =Math.floor(1000+ Math.random()*9000)
+        user.code=code
+        await user.save()
+        await sendEmailResetCode(email,user.username,code)
+        res.status(200).json({message:"code has been sent to your email" ,success:true})
+    }catch(error){
+        res.status(500).json({message: error.message})
+    }
+}
 module.exports.loginUser=async(req, res)=>{
    try{ 
     

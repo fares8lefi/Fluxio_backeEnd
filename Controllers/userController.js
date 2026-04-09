@@ -9,28 +9,22 @@ const createToken = (id) => {
 };
 module.exports.createUser =async(req,res) =>{
     try{
+            const missing =["username","password","phone","email"].find(key => !req.body[key])
+            if(missing){
+                return res.status(400).json({message:`missing field :${missing}`})
+            }
             const {username,password,phone,email}=req.body;
-            if(!username){
-                return res.status(400).json({error:"Username is required"});
-            }
-             if(!password){
-                return res.status(400).json({error:"password is required"});
-            }
-             if(!phone){
-                return res.status(400).json({error:"phone is required"});
-            }
-            if(!email){
-                return res.status(400).json({error:"email is required"});
-            }
+            const role = "admin"
             await userModel.create(
                 {
                     username,
                     email,
                     password,
                     phone,
+                    role,
                 }
             )
-         res.status(200).json({message :"user add successflly"})   
+         res.status(200).json({message :"user added successfully" ,success:true})   
     }catch(err){
         console.log(err);
         res.status(500).json({error:err.message})
@@ -88,7 +82,7 @@ module.exports.getConnectedUser = async (req, res) => {
     }
 }
 
-module.exports.logOutUser = async (req, res) => {
+module.exports.logOutUser = async (res) => {
     try {
         res.cookie("jwt_login", "", {
             maxAge: 1,
@@ -109,7 +103,7 @@ module.exports.changePassword = async (req,res)=>{
         console.log(change)
         if (change) {
           const salt = await bcrypt.genSalt();
-          console.log("================", newPassword)
+          
           const hashedPassword = await bcrypt.hash(newPassword, salt)
           const update = await userModel.findByIdAndUpdate(id, {
             password: hashedPassword
@@ -180,7 +174,7 @@ module.exports.updateUserStatus= async function (req , res){
 
 module.exports.getAllUsers =async function (req , res) {
     try{
-        const users = await userModel.find();
+        const users = await userModel.find().select("-password");
         res.status(200).json({success: true,users})
     }catch(error){
         res.status(500).json({success: false, message: error.message})

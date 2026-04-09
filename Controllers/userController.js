@@ -1,6 +1,7 @@
 const userModel = require('../models/userModel');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
+const {sendEmailVerificationCode,sendEmailResetCode}=require('../services/SendEmail');
 const maxTime = 240 * 60 * 60;
 const createToken = (id) => {
     
@@ -14,17 +15,19 @@ module.exports.createUser =async(req,res) =>{
                 return res.status(400).json({message:`missing field :${missing}`})
             }
             const {username,password,phone,email}=req.body;
-            const role = "admin"
+            const code = Math.floor(1000 + Math.random() * 9000);
+            await sendEmailVerificationCode(email, username, code);
             await userModel.create(
                 {
                     username,
                     email,
                     password,
                     phone,
-                    role,
+                    code,
+                    is_active: false,
                 }
             )
-         res.status(200).json({message :"user added successfully" ,success:true})   
+         res.status(200).json({message :"code has been sent to your email" ,success:true})   
     }catch(err){
         console.log(err);
         res.status(500).json({error:err.message})

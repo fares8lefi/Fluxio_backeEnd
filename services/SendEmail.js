@@ -89,10 +89,13 @@ const htmlTemplate = (username, otpDigits) => `<!DOCTYPE html>
     background: #1A2236;
     border: 1.5px solid #2A3A55;
     border-radius: 14px;
-    display: inline-flex; align-items: center; justify-content: center;
+    display: flex; align-items: center; justify-content: center;
+    text-align: center;
+    line-height: 1;
     font-family: 'Courier New', monospace;
     font-size: 28px; font-weight: 700; color: #F1F5F9;
   }
+    
   .otp-digit.accent {
     border-color: rgba(6,182,212,0.5);
     background: linear-gradient(180deg, rgba(6,182,212,0.08) 0%, #1A2236 100%);

@@ -99,7 +99,6 @@ module.exports.foorgetPasswordVerifyCode=async(req,res)=>{
 
 module.exports.loginUser=async(req, res)=>{
    try{ 
-    
     const {email,password}=req.body;
     const user =await userModel.login(email,password);
     const token = createToken(user._id);

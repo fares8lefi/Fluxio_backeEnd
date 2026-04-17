@@ -1,7 +1,11 @@
 const categorieModel = require('../models/categorieModel')
-
+const { validateCategorieRegistration, validateCategorieUpdate } = require('../validations/CategorieValidations');
 module.exports.createcategory = async function(req, res) {
     try {
+        const validationResult = validateCategorieRegistration(req.body);
+        if (!validationResult.isValid) {
+            return res.status(400).json({success: false, message: validationResult.errors});
+        }
         const {name, code} = req.body;
         const existingCategory = await categorieModel.verifNameCode(code, name);
         if (existingCategory) {
@@ -19,13 +23,19 @@ module.exports.getAllCategories = async function(res){
     try{
         const categories = await  categorieModel.find();
         res.status(200).json({categories });
+        
     }catch(error){
         res.status(500).json({ message: error.message });
     }
 }
 
 module.exports.updateCategorie = async function(req, res) {
+   
     try {
+        const validationResult = validateCategorieUpdate(req.body);
+        if (!validationResult.isValid) {
+            return res.status(400).json({success: false, message: validationResult.errors});
+        }   
         const {id, name, code} = req.body;
         
         if (!id) {

@@ -2,6 +2,8 @@ const userModel = require('../models/userModel');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const {sendEmailVerificationCode,sendEmailResetCode}=require('../services/SendEmail');
+const { validateUserRegistration, validateUserUpdate, validatePassword, validateLogin } = require('../validations/USerValidations');
+
 const maxTime = 240 * 60 * 60;
 const createToken = (id) => {
     
@@ -10,11 +12,14 @@ const createToken = (id) => {
 };
 module.exports.createUser =async(req,res) =>{
     try{
-            const missing =["username","password","phone","email"].find(key => !req.body[key])
-            if(missing){
-                return res.status(400).json({message:`missing field :${missing}`})
+            const { errors, isValid } = validateUserRegistration(req.body);
+
+            if (!isValid) {
+                return res.status(400).json({ errors, success: false });
             }
+            
             const {username,password,phone,email}=req.body;
+
             const code = Math.floor(1000 + Math.random() * 9000);
             console.log("code ====",code)
             await Promise.all([
@@ -76,20 +81,26 @@ module.exports.resendCode=async(req,res)=>{
 module.exports.foorgetPasswordVerifyCode=async(req,res)=>{
     try{
         const {email , newPassword}=req.body;
-        const user= await userModel.find({email}).select("-password")
+        const { errors, isValid } = validatePassword(newPassword);
+        if (!isValid) {
+            return res.status(400).json({ errors, success: false });
+        }
+
+        const user= await userModel.findOne({email}).select("-password")
         if(!user){
-            res.status(500).json({message: error.message})
+            return res.status(404).json({message: "User not found"})
         }
         const code =Math.floor(1000+ Math.random()*9000)
         user.code=code
         await user.save()
         await sendEmailResetCode(email,user.username,code)
+        
         const salt = await bcrypt.genSalt();
-          
-          const hashedPassword = await bcrypt.hash(newPassword, salt)
-         await userModel.findByIdAndUpdate(id, {
+        const hashedPassword = await bcrypt.hash(newPassword, salt)
+        
+        await userModel.findByIdAndUpdate(user._id, {
             password: hashedPassword
-          })
+        })
         res.status(200).json({message:"password has been changed successfully" ,success:true})
     }catch(error){
         res.status(500).json({message: error.message})
@@ -97,10 +108,18 @@ module.exports.foorgetPasswordVerifyCode=async(req,res)=>{
 }
 
 
+
 module.exports.loginUser=async(req, res)=>{
    try{ 
+    const { errors, isValid } = validateLogin(req.body);
+
+    if (!isValid) {
+        return res.status(400).json({ errors, success: false });
+    }
+
     const {email,password}=req.body;
     const user =await userModel.login(email,password);
+
     const token = createToken(user._id);
              
              res.cookie("jwt_login", token, {
@@ -159,35 +178,53 @@ module.exports.logOutUser = async (res) => {
     }
 }
 
-module.exports.changePassword = async (req,res)=>{
-    try{
-        const {currentPassord, newPassword ,code} = req.body;
-        const id = req.session.user?._id;
-        const change = await userModel.verifPasswordUser(id, currentPassord)
-        console.log(change)
-        if (change) {
-          const salt = await bcrypt.genSalt();
-          
-          const hashedPassword = await bcrypt.hash(newPassword, salt)
-         await userModel.findByIdAndUpdate(id, {
-            password: hashedPassword
-          })
+module.exports.changePassword = async (req, res) => {
+    try {
+        const { currentPassord, newPassword, code } = req.body;
+        const id = req.session.user?._id || req.user?._id;
 
-          return res.status(200).json({
-            success: true,
-            message: "Password updated successfully"
+        if (!id) {
+            return res.status(401).json({ message: 'Not authenticated' });
+        }
+
+        const change = await userModel.verifPasswordUser(id, currentPassord);
+
+        if (change) {
+            const { errors, isValid } = validatePassword(newPassword);
+            if (!isValid) {
+                return res.status(400).json({ errors, success: false });
+            }
+
+            const salt = await bcrypt.genSalt();
+            const hashedPassword = await bcrypt.hash(newPassword, salt);
+            await userModel.findByIdAndUpdate(id, {
+                password: hashedPassword
+            });
+
+            return res.status(200).json({
+                success: true,
+                message: "Password updated successfully"
             });
         }
-       
-    }catch(error){
-        
+
+        return res.status(401).json({ message: 'Current password incorrect' });
+    } catch (error) {
         res.status(500).json({ message: error.message });
     }
 }
 
+
+
 module.exports.updatePersonnelData = async function(req ,res){
     try{
+        const { errors, isValid } = validateUserUpdate(req.body);
+
+        if (!isValid) {
+            return res.status(400).json({ errors, success: false });
+        }
+
         const {username , email, phone , password}= req.body
+
     
         const id = req.session?.user?._id || req.user?._id;
 

@@ -65,3 +65,8 @@ const validateSupplierUpdate = (data) => {
         isValid: Object.keys(errors).length === 0
     };
 };
+
+module.exports = {
+    validateSupplierRegistration,
+    validateSupplierUpdate
+};  

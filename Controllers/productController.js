@@ -1,9 +1,13 @@
 const categorieModel = require("../models/categorieModel");
 const supplierModel = require("../models/suppliersModel");
 const productModel = require("../models/productModel");
-
+const { validateProductRegistration, validateProductUpdate } = require('../validations/ProductValidations');
 module.exports.addProduct = async function (req, res) {
   try {
+    const validationResult = validateProductRegistration(req.body);
+    if (!validationResult.isValid) {
+      return res.status(400).json({success: false, message: validationResult.errors});
+    }
     const {
       code,
       barcode,
@@ -85,6 +89,10 @@ module.exports.getAllProduct = async function (req, res) {
 
 module.exports.updateProduct = async function (req, res) {
   try {
+    const validationResult = validateProductUpdate(req.body);
+    if (!validationResult.isValid) {
+      return res.status(400).json({success: false, message: validationResult.errors});
+    }
     const id = req.params.id;
     const {
       code,

@@ -1,7 +1,12 @@
 const supplierModel = require("../models/suppliersModel");
+const { validateSupplierRegistration, validateSupplierUpdate } = require('../validations/SuppliersValidations');
 
 module.exports.addSuppliers = async function (req, res) {
   try {
+    const validationResult = validateSupplierRegistration(req.body);
+    if (!validationResult.isValid) {
+      return res.status(400).json({success: false, message: validationResult.errors});
+    }
     const { name, code, email, phone, address } = req.body;
     const suppliers = await supplierModel.create({
       name,
@@ -18,6 +23,10 @@ module.exports.addSuppliers = async function (req, res) {
 
 module.exports.updateSuppliers = async function (req, res) {
   try {
+    const validationResult = validateSupplierUpdate(req.body);
+    if (!validationResult.isValid) {
+      return res.status(400).json({success: false, message: validationResult.errors});
+    }
     const { name, code, email, phone, address } = req.body;
     const id = req.params.id;
     const verifId = await supplierModel.findById(id);

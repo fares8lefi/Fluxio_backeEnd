@@ -45,8 +45,42 @@ const validateProductRegistration = (data) => {
     };
 };
 
+/**
+ * Validates product update data.
+ * @param {Object} data - The product data to validate.
+ * @returns {Object} An object containing errors and a boolean indicating validity.
+ */
+const validateProductUpdate = (data) => {
+    let errors = {};
+    const { name, description, price, quantity, categorie } = data;
+
+    if (name && !validator.isEmpty(String(name).trim())) {
+        errors.name = 'Name is required';
+    }
+
+    if (description && !validator.isEmpty(String(description).trim())) {
+        errors.description = 'Description is required';
+    }
+
+    if (price && !validator.isFloat(price, { min: 0 })) {
+        errors.price = 'Price must be a non-negative number';
+    }
+
+    if (quantity && !validator.isInt(quantity, { min: 0 })) {
+        errors.quantity = 'Quantity must be a non-negative integer';
+    }
+
+    if (categorie && !validator.isEmpty(String(categorie).trim())) {
+        errors.categorie = 'Categorie is required';
+    }
+
+    return {
+        errors,
+        isValid: Object.keys(errors).length === 0
+    };
+};
 
 module.exports = {
     validateProductRegistration,
-    
+    validateProductUpdate
 };      

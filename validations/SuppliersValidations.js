@@ -39,3 +39,29 @@ const validateSupplierRegistration = (data) => {
  * @param {Object} data - The user data to validate.
  * @returns {Object} An object containing errors and a boolean indicating validity.
  */
+
+const validateSupplierUpdate = (data) => {
+    let errors = {};
+    const { name, email, phone, address } = data;
+
+    if (name && !validator.isEmpty(String(name).trim())) {
+        errors.name = 'Name is required';
+    }
+
+    if (email && !validator.isEmail(email)) {
+        errors.email = 'Email is invalid';
+    }
+
+    if (phone && !validator.isEmpty(String(phone).trim())) {
+        errors.phone = 'Phone is required';
+    }
+
+    if (address && !validator.isEmpty(String(address).trim())) {
+        errors.address = 'Address is required';
+    }
+
+    return {
+        errors,
+        isValid: Object.keys(errors).length === 0
+    };
+};

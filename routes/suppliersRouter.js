@@ -6,12 +6,12 @@ const {requireAuthUser}= require("../middlewares/authMiddelwares");
 
 
 
-router.post('/addSuppliers', suppliersController.addSuppliers);
-router.delete('/deleteSuppliers/:id', suppliersController.deleteSuppliers);
-router.put('/updateSuppliers/:id', suppliersController.updateSuppliers);
-router.get('/getAllSuppliers', suppliersController.getAllSuppliers);
+router.post('/addSuppliers',requireAuthUser, suppliersController.addSuppliers);
+router.delete('/deleteSuppliers/:id',requireAuthUser, suppliersController.deleteSuppliers);
+router.put('/updateSuppliers/:id',requireAuthUser, suppliersController.updateSuppliers);
+router.get('/getAllSuppliers',requireAuthUser, suppliersController.getAllSuppliers);
 router.get('/getActiveSuppliers', suppliersController.getActiveSuppliers);
-router.patch('/updateSuppliersStatus/:id', suppliersController.updateSuppliersStatus);
-router.get('/serachSuppliersbyName', suppliersController.serachSuppliersbyName);
+router.patch('/updateSuppliersStatus/:id',requireAuthUser, suppliersController.updateSuppliersStatus);
+router.get('/searchSuppliersByName', requireAuthUser, suppliersController.searchSuppliersByName);
 
 module.exports = router;

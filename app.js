@@ -34,9 +34,9 @@ app.use(express.static(path.join(__dirname, "public")));
 
 
 app.use("/api/users", usersRouter);
-app.use("/api/categorie", categorieRouter);
-app.use("/api/supplier", suppliersRouter);
-app.use("/api/product", productRouter);
+app.use("/api/categories", categorieRouter);
+app.use("/api/suppliers", suppliersRouter);
+app.use("/api/products", productRouter);
 
 
 app.use((req, res) => {

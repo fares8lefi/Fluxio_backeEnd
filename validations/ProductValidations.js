@@ -1,42 +1,51 @@
 const validator = require('validator');
 
 /** 
- * Validates product registration data.
- * @param {Object} data - The product data to validate.
- * @returns {Object} An object containing errors and a boolean indicating validity.
+ * Valide les données de création d'un produit.
  */
 const validateProductRegistration = (data) => {
     let errors = {};
 
-    const { name, description, price, quantity, categorie } = data;
+    const { code, barcode, name, purchase_price, selling_price, unit, stock_min } = data;
 
-    // Name validation
+    if (!code || validator.isEmpty(String(code).trim())) {
+        errors.code = 'Le code est requis';
+    } else if (!validator.isInt(String(code))) {
+        errors.code = 'Le code doit être un nombre entier';
+    }
+
+    if (!barcode || validator.isEmpty(String(barcode).trim())) {
+        errors.barcode = 'Le code-barres est requis';
+    } else if (!validator.isInt(String(barcode))) {
+        errors.barcode = 'Le code-barres doit être un nombre entier';
+    }
+
     if (!name || validator.isEmpty(String(name).trim())) {
-        errors.name = 'Name is required';
+        errors.name = 'Le nom est requis';
     }
 
-    // Description validation
-    if (!description || validator.isEmpty(String(description).trim())) {
-        errors.description = 'Description is required';
+    if (purchase_price === undefined || validator.isEmpty(String(purchase_price).trim())) {
+        errors.purchase_price = 'Le prix d\'achat est requis';
+    } else if (!validator.isFloat(String(purchase_price), { min: 0 })) {
+        errors.purchase_price = 'Le prix d\'achat doit être un nombre positif';
     }
 
-    // Price validation
-    if (!price || validator.isEmpty(String(price).trim())) {
-        errors.price = 'Price is required';
-    } else if (!validator.isFloat(price, { min: 0 })) {
-        errors.price = 'Price must be a non-negative number';
+    if (selling_price === undefined || validator.isEmpty(String(selling_price).trim())) {
+        errors.selling_price = 'Le prix de vente est requis';
+    } else if (!validator.isFloat(String(selling_price), { min: 0 })) {
+        errors.selling_price = 'Le prix de vente doit être un nombre positif';
     }
 
-    // Quantity validation
-    if (!quantity || validator.isEmpty(String(quantity).trim())) {
-        errors.quantity = 'Quantity is required';
-    } else if (!validator.isInt(quantity, { min: 0 })) {
-        errors.quantity = 'Quantity must be a non-negative integer';
+    if (unit === undefined || validator.isEmpty(String(unit).trim())) {
+        errors.unit = 'L\'unité/quantité est requise';
+    } else if (!validator.isInt(String(unit), { min: 0 })) {
+        errors.unit = 'L\'unité doit être un nombre entier positif';
     }
 
-    // Categorie validation
-    if (!categorie || validator.isEmpty(String(categorie).trim())) {
-        errors.categorie = 'Categorie is required';
+    if (stock_min === undefined || validator.isEmpty(String(stock_min).trim())) {
+        errors.stock_min = 'Le stock minimum est requis';
+    } else if (!validator.isInt(String(stock_min), { min: 0 })) {
+        errors.stock_min = 'Le stock minimum doit être un nombre entier positif';
     }
 
     return {
@@ -46,32 +55,50 @@ const validateProductRegistration = (data) => {
 };
 
 /**
- * Validates product update data.
- * @param {Object} data - The product data to validate.
- * @returns {Object} An object containing errors and a boolean indicating validity.
+ * Valide les données de mise à jour d'un produit.
  */
 const validateProductUpdate = (data) => {
     let errors = {};
-    const { name, description, price, quantity, categorie } = data;
+    const { code, barcode, name, purchase_price, selling_price, unit, stock_min } = data;
 
-    if (name && !validator.isEmpty(String(name).trim())) {
-        errors.name = 'Name is required';
+    if (code !== undefined && validator.isEmpty(String(code).trim())) {
+        errors.code = 'Le code ne peut pas être vide';
+    } else if (code !== undefined && !validator.isInt(String(code))) {
+        errors.code = 'Le code doit être un nombre entier';
     }
 
-    if (description && !validator.isEmpty(String(description).trim())) {
-        errors.description = 'Description is required';
+    if (barcode !== undefined && validator.isEmpty(String(barcode).trim())) {
+        errors.barcode = 'Le code-barres ne peut pas être vide';
+    } else if (barcode !== undefined && !validator.isInt(String(barcode))) {
+        errors.barcode = 'Le code-barres doit être un nombre entier';
     }
 
-    if (price && !validator.isFloat(price, { min: 0 })) {
-        errors.price = 'Price must be a non-negative number';
+    if (name !== undefined && validator.isEmpty(String(name).trim())) {
+        errors.name = 'Le nom ne peut pas être vide';
     }
 
-    if (quantity && !validator.isInt(quantity, { min: 0 })) {
-        errors.quantity = 'Quantity must be a non-negative integer';
+    if (purchase_price !== undefined) {
+        if (!validator.isFloat(String(purchase_price), { min: 0 })) {
+            errors.purchase_price = 'Le prix d\'achat doit être un nombre positif';
+        }
     }
 
-    if (categorie && !validator.isEmpty(String(categorie).trim())) {
-        errors.categorie = 'Categorie is required';
+    if (selling_price !== undefined) {
+        if (!validator.isFloat(String(selling_price), { min: 0 })) {
+            errors.selling_price = 'Le prix de vente doit être un nombre positif';
+        }
+    }
+
+    if (unit !== undefined) {
+        if (!validator.isInt(String(unit), { min: 0 })) {
+            errors.unit = 'L\'unité doit être un nombre entier positif';
+        }
+    }
+
+    if (stock_min !== undefined) {
+        if (!validator.isInt(String(stock_min), { min: 0 })) {
+            errors.stock_min = 'Le stock minimum doit être un nombre entier positif';
+        }
     }
 
     return {
@@ -83,4 +110,4 @@ const validateProductUpdate = (data) => {
 module.exports = {
     validateProductRegistration,
     validateProductUpdate
-};      
+};

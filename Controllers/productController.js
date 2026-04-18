@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const categorieModel = require("../models/categorieModel");
 const supplierModel = require("../models/suppliersModel");
 const productModel = require("../models/productModel");
@@ -22,6 +23,9 @@ module.exports.addProduct = async function (req, res) {
 
     // Vérifier si le fournisseur existe
     if (supplier) {
+      if (!mongoose.Types.ObjectId.isValid(supplier)) {
+        return res.status(400).json({ success: false, message: "Format d'ID fournisseur invalide" });
+      }
       const supplierExists = await supplierModel.findById(supplier);
       if (!supplierExists) {
         return res.status(400).json({ success: false, message: "Fournisseur introuvable" });
@@ -29,13 +33,14 @@ module.exports.addProduct = async function (req, res) {
     }
 
     // Vérifier si les catégories existent
-    if (categories && categories.length > 0) {
+    if (categories && Array.isArray(categories)) {
       for (const catId of categories) {
+        if (!mongoose.Types.ObjectId.isValid(catId)) {
+          return res.status(400).json({ success: false, message: `Format d'ID catégorie invalide : ${catId}` });
+        }
         const catExists = await categorieModel.findById(catId);
         if (!catExists) {
-          return res
-            .status(400)
-            .json({ success: false, message: `Catégorie introuvable: ${catId}` });
+          return res.status(400).json({ success: false, message: `Catégorie introuvable : ${catId}` });
         }
       }
     }
@@ -114,6 +119,9 @@ module.exports.updateProduct = async function (req, res) {
 
     // Vérifier si le fournisseur existe (si fourni)
     if (supplier) {
+      if (!mongoose.Types.ObjectId.isValid(supplier)) {
+        return res.status(400).json({ success: false, message: "Format d'ID fournisseur invalide" });
+      }
       const supplierExists = await supplierModel.findById(supplier);
       if (!supplierExists) {
         return res.status(400).json({ success: false, message: "Fournisseur introuvable" });
@@ -121,13 +129,14 @@ module.exports.updateProduct = async function (req, res) {
     }
 
     // Vérifier si les catégories existent (si fournies)
-    if (categories && categories.length > 0) {
+    if (categories && Array.isArray(categories)) {
       for (const catId of categories) {
+        if (!mongoose.Types.ObjectId.isValid(catId)) {
+          return res.status(400).json({ success: false, message: `Format d'ID catégorie invalide : ${catId}` });
+        }
         const catExists = await categorieModel.findById(catId);
         if (!catExists) {
-          return res
-            .status(400)
-            .json({ success: false, message: `Catégorie introuvable: ${catId}` });
+          return res.status(400).json({ success: false, message: `Catégorie introuvable : ${catId}` });
         }
       }
     }

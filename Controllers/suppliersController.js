@@ -67,9 +67,9 @@ module.exports.deleteSuppliers = async function (req, res) {
 };
 
 
-module.exports.getActiveSuppliers = async function(req, res) {
+module.exports.getActiveSuppliers = async function(_req, res) {
   try {
-    const suppliers = await supplierModel.find({ is_active: true });
+    const suppliers = await supplierModel.find({ is_active: true }).select("name code email phone address");
     if (suppliers.length === 0) {
       return res.status(404).json({ success: false, message: "no active suppliers found" });
     }
@@ -91,27 +91,29 @@ module.exports.updateSuppliersStatus = async function(req, res) {
     });
     res.status(200).json({ success: true, message: "suppliers are inactive" });
   } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+    res.status(500).json({ message: error.message });  }
 }
 
 
 
-module.exports.serachSuppliersbyName = async function(req, res) {
+module.exports.searchSuppliersByName = async function(req, res) {
   try {
-      const { name } = req.body; 
+      const { name } = req.query; 
 
       if (!name) {
-        return res.status(400).json({ success: false, message: "Name is required" });
+        return res.status(400).json({ success: false, message: "Name parameter is required" });
       }
 
-      const suppliers = await supplierModel.find({ name }); 
+    
+      const suppliers = await supplierModel.find({ 
+        name: { $regex: name, $options: "i" } 
+      }); 
 
       if (!suppliers || suppliers.length === 0) {
-        return res.status(404).json({ success: false, message: "Suppliers not found" });
+        return res.status(404).json({ success: false, message: "No suppliers matching that name found" });
       }
 
-      res.status(200).json({ success: true, suppliers });
+      res.status(200).json({ success: true, count: suppliers.length, suppliers });
 
   } catch (error) {
       console.log("error ===>", error);
@@ -119,7 +121,7 @@ module.exports.serachSuppliersbyName = async function(req, res) {
   }
 }
 
-module.exports.getAllSuppliers = async function(req, res) {
+module.exports.getAllSuppliers = async function(_req, res) {
   try {
     const suppliers = await supplierModel.find();
     if (suppliers.length === 0) {

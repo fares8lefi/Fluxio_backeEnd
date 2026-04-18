@@ -44,20 +44,20 @@ const validateSupplierUpdate = (data) => {
     let errors = {};
     const { name, email, phone, address } = data;
 
-    if (name && !validator.isEmpty(String(name).trim())) {
-        errors.name = 'Name is required';
+    if (name !== undefined && validator.isEmpty(String(name).trim())) {
+        errors.name = 'Name is required if provided';
     }
 
     if (email && !validator.isEmail(email)) {
         errors.email = 'Email is invalid';
     }
 
-    if (phone && !validator.isEmpty(String(phone).trim())) {
-        errors.phone = 'Phone is required';
+    if (phone !== undefined && validator.isEmpty(String(phone).trim())) {
+        errors.phone = 'Phone is required if provided';
     }
 
-    if (address && !validator.isEmpty(String(address).trim())) {
-        errors.address = 'Address is required';
+    if (address !== undefined && validator.isEmpty(String(address).trim())) {
+        errors.address = 'Address is required if provided';
     }
 
     return {

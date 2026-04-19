@@ -82,11 +82,38 @@ module.exports.deleteProduct = async function (req, res) {
 
 module.exports.getAllProduct = async function (req, res) {
   try {
-    const products = await productModel.find().populate('supplier').populate('categories');
+    // paramètres de pagination
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    // requête avec pagination
+    const products = await productModel
+      .find()
+      .populate('supplier')
+      .populate('categories')
+      .skip(skip)
+      .limit(limit);
+
+    // total des produits 
+    const total = await productModel.countDocuments();
+
     if (products.length === 0) {
-      return res.status(404).json({ success: false, message: "aucun produit trouvé" });
+      return res.status(404).json({
+        success: false,
+        message: "aucun produit trouvé",
+      });
     }
-    return res.status(200).json({ success: true, products });
+
+    return res.status(200).json({
+      success: true,
+      products,
+      pagination: {
+        total,
+        page,
+        pages: Math.ceil(total / limit),
+      },
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

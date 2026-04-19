@@ -167,3 +167,20 @@ module.exports.updateProduct = async function (req, res) {
     return res.status(500).json({ message: error.message });
   }
 };
+
+module.exports.getProductById = async function (req, res) {
+  try {
+    const id = req.params.id;
+   const product = await productModel
+  .findById(id)
+  .select('code name unit') 
+  .populate({ path: 'supplier', select: 'name' })
+  .populate({ path: 'categories', select: 'name' });
+    if (!product) {
+      return res.status(404).json({ success: false, message: "Produit non trouvé" });
+    }
+    return res.status(200).json({ success: true, product });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};

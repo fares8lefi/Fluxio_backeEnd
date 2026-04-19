@@ -185,7 +185,7 @@ module.exports.getProductById = async function (req, res) {
   }
 };
 
-module.exports.getProductByF = async function (req, res) {
+module.exports.getProductByFiltres = async function (req, res) {
 try{
   const validationResult = validateProductSearch(req.query);
     if (!validationResult.isValid) {

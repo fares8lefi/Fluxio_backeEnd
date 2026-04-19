@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const categorieModel = require("../models/categorieModel");
 const supplierModel = require("../models/suppliersModel");
 const productModel = require("../models/productModel");
-const { validateProductRegistration, validateProductUpdate } = require('../validations/ProductValidations');
+const { validateProductRegistration, validateProductUpdate ,validateProductSearch} = require('../validations/ProductValidations');
 module.exports.addProduct = async function (req, res) {
   try {
     const validationResult = validateProductRegistration(req.body);
@@ -184,3 +184,27 @@ module.exports.getProductById = async function (req, res) {
     res.status(500).json({ message: error.message });
   }
 };
+
+module.exports.getProductByF = async function (req, res) {
+try{
+  const validationResult = validateProductSearch(req.query);
+    if (!validationResult.isValid) {
+      return res.status(400).json({success: false, message: validationResult.errors});
+    }
+const {name,unit,Maxprice,MinPrice}=req.query;
+ const filter = {};
+ if (name) filter.name = name;
+ if (unit) filter.unit = unit;
+ if (Maxprice) filter.selling_price = { $lte: Maxprice };
+ if (MinPrice) filter.selling_price = { $gte: MinPrice };
+ const products = await productModel.find(filter).populate('supplier').populate('categories');
+ if (products.length === 0) {
+   return res.status(404).json({ success: false, message: "aucun produit trouvé" });
+ }
+ return res.status(200).json({ success: true, products });
+
+}catch(error){
+  res.status(500).json({ message: error.message });
+}
+}
+  

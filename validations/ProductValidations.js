@@ -107,7 +107,40 @@ const validateProductUpdate = (data) => {
     };
 };
 
+const validateProductSearch = (data) => {
+    const{name,unit,maxPrice,minPrice} = data;
+    let errors={}
+    if (name !== undefined && validator.isEmpty(String(name).trim())) {
+        errors.name='Le nom ne peut pas être vide';
+    }
+    if (unit !== undefined && validator.isEmpty(String(unit).trim())) {
+        errors.unit='Le code ne peut pas être vide';
+    } else if (code !== undefined && !validator.isInt(String(unit))) {
+        errors.unit='Le code doit être un nombre entier';
+    }
+    if (maxPrice !== undefined && validator.isEmpty(String(maxPrice).trim())) {
+        errors.maxPrice='Le prix maximum ne peut pas être vide';
+    } else if (maxPrice !== undefined && !validator.isFloat(String(maxPrice), { min: 0 })) {
+        errors.maxPrice='Le prix maximum doit être un nombre positif';
+    }
+    if (minPrice !== undefined && validator.isEmpty(String(minPrice).trim())) {
+        errors.minPrice='Le prix minimum ne peut pas être vide';
+    } else if (minPrice !== undefined && !validator.isFloat(String(minPrice), { min: 0 })) {
+        errors.minPrice='Le prix minimum doit être un nombre positif';
+    }
+    return {
+        errors,
+        isValid: Object.keys(errors).length === 0
+    };
+}
+
+    
+
+
+
+
 module.exports = {
     validateProductRegistration,
-    validateProductUpdate
+    validateProductUpdate,
+    validateProductSearch
 };

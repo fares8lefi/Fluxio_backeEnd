@@ -301,3 +301,47 @@ module.exports.getSumProductBySupplier = async function (_req, res) {
     res.status(500).json({ message: error.message });
   }
 } 
+
+
+module.exports.getProductsBySupplier = async function (_req, res) {
+  try {
+    const products = await productModel.aggregate([
+      { $unwind: "$supplier" },
+      {
+        $lookup: {
+          from: "suppliers",
+          localField: "supplier",
+          foreignField: "_id",
+          as: "supplierInfo"
+        }
+      },
+      { $unwind: "$supplierInfo" },
+      {
+        $group: {
+          _id: "$supplierInfo.name",
+          products: {
+            $push: {
+              _id: "$_id",
+              name: "$name",
+              price: "$selling_price",
+              quantity: "$unit"
+            }
+          },
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          supplier: "$_id",
+          count: 1,
+          products: 1
+        }
+      }
+    ]);
+    return res.status(200).json({ success: true, products });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+}
+

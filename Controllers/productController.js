@@ -269,10 +269,20 @@ module.exports.getSumProductByCategorie = async function (_req, res) {
   }
 } 
 
-module.exports.getSumProductBySupplier = async function (_req, res) {
+
+module.exports.getProductsByCategories = async function (_req, res) {
   try {
     const products = await productModel.aggregate([
-      { $unwind: "$supplier" },
+      { $unwind: "$categories" },
+      {
+        $lookup: {
+          from: "categories",
+          localField: "categories",
+          foreignField: "_id",
+          as: "categoryInfo"
+        }
+      },
+      { $unwind: "$categoryInfo" },
       {
         $lookup: {
           from: "suppliers",
@@ -281,50 +291,18 @@ module.exports.getSumProductBySupplier = async function (_req, res) {
           as: "supplierInfo"
         }
       },
-      { $unwind: "$supplierInfo" },
+      { $unwind: { path: "$supplierInfo", preserveNullAndEmptyArrays: true } },
       {
         $group: {
-          _id: "$supplierInfo.name",
-          count: { $sum: 1 }
-        }
-      },
-      {
-        $project: {
-          _id: 0,
-          supplier: "$_id",
-          count: 1
-        }
-      }
-    ]);
-    return res.status(200).json({ success: true, products });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-} 
-
-
-module.exports.getProductsBySupplier = async function (_req, res) {
-  try {
-    const products = await productModel.aggregate([
-      { $unwind: "$supplier" },
-      {
-        $lookup: {
-          from: "suppliers",
-          localField: "supplier",
-          foreignField: "_id",
-          as: "supplierInfo"
-        }
-      },
-      { $unwind: "$supplierInfo" },
-      {
-        $group: {
-          _id: "$supplierInfo.name",
+          _id: "$categoryInfo._id",
+          categoryName: { $first: "$categoryInfo.name" },
           products: {
             $push: {
               _id: "$_id",
               name: "$name",
               price: "$selling_price",
-              quantity: "$unit"
+              quantity: "$unit",
+              supplier: "$supplierInfo.name"
             }
           },
           count: { $sum: 1 }
@@ -333,7 +311,7 @@ module.exports.getProductsBySupplier = async function (_req, res) {
       {
         $project: {
           _id: 0,
-          supplier: "$_id",
+          category: "$categoryName",
           count: 1,
           products: 1
         }
@@ -348,7 +326,6 @@ module.exports.getProductsBySupplier = async function (_req, res) {
 module.exports.getSuppliersByProduct = async function (_req, res) {
   try {
     const products = await productModel.aggregate([
-      { $unwind: "$supplier" },
       {
         $lookup: {
           from: "suppliers",
@@ -357,29 +334,12 @@ module.exports.getSuppliersByProduct = async function (_req, res) {
           as: "supplierInfo"
         }
       },
-      { $unwind: "$supplierInfo" },
-      {
-        $group: {
-          _id: "$_id",
-          name: { $first: "$name" },
-          price: { $first: "$selling_price" },
-          quantity: { $first: "$unit" },
-          suppliers: {
-            $push: {
-              _id: "$supplierInfo._id",
-              name: "$supplierInfo.name"
-            }
-          }
-        }
-      },
+      { $unwind: { path: "$supplierInfo", preserveNullAndEmptyArrays: true } },
       {
         $project: {
-          _id: 1,
-          name: 1,
-          price: 1,
-          quantity: 1,
-          suppliers: 1,
-          supplierCount: { $size: "$suppliers" }
+          _id: 0,
+          productName: "$name",
+          supplier: "$supplierInfo.name"
         }
       }
     ]);

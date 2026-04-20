@@ -269,3 +269,35 @@ module.exports.getSumProductByCategorie = async function (_req, res) {
   }
 } 
 
+module.exports.getSumProductBySupplier = async function (_req, res) {
+  try {
+    const products = await productModel.aggregate([
+      { $unwind: "$supplier" },
+      {
+        $lookup: {
+          from: "suppliers",
+          localField: "supplier",
+          foreignField: "_id",
+          as: "supplierInfo"
+        }
+      },
+      { $unwind: "$supplierInfo" },
+      {
+        $group: {
+          _id: "$supplierInfo.name",
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          supplier: "$_id",
+          count: 1
+        }
+      }
+    ]);
+    return res.status(200).json({ success: true, products });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+} 

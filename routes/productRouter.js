@@ -15,4 +15,5 @@ router.delete('/deleteProduct/:id',requireAuthUser, productController.deleteProd
 router.get('/getAllProduct',requireAuthUser, productController.getAllProduct);
 router.get('/getProductById/:id',requireAuthUser, productController.getProductById);
 router.get('/getProductByFiltres',requireAuthUser, productController.getProductByFiltres);
+router.get('/getSumProductByCategorie',requireAuthUser, productController.getSumProductByCategorie);
 module.exports = router;

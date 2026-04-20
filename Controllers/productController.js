@@ -235,3 +235,37 @@ const {name,unit,Maxprice,MinPrice}=req.query;
 }
 }
   
+
+module.exports.getSumProductByCategorie = async function (_req, res) {
+  try {
+    const products = await productModel.aggregate([
+      { $unwind: "$categories" },
+      {
+        $lookup: {
+          from: "categories",
+          localField: "categories",
+          foreignField: "_id",
+          as: "categoryInfo"
+        }
+      },
+      { $unwind: "$categoryInfo" },
+      {
+        $group: {
+          _id: "$categoryInfo.name",
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          category: "$_id",
+          count: 1
+        }
+      }
+    ]);
+    return res.status(200).json({ success: true, products });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+} 
+

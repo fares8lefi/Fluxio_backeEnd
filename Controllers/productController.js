@@ -345,3 +345,46 @@ module.exports.getProductsBySupplier = async function (_req, res) {
   }
 }
 
+module.exports.getSuppliersByProduct = async function (_req, res) {
+  try {
+    const products = await productModel.aggregate([
+      { $unwind: "$supplier" },
+      {
+        $lookup: {
+          from: "suppliers",
+          localField: "supplier",
+          foreignField: "_id",
+          as: "supplierInfo"
+        }
+      },
+      { $unwind: "$supplierInfo" },
+      {
+        $group: {
+          _id: "$_id",
+          name: { $first: "$name" },
+          price: { $first: "$selling_price" },
+          quantity: { $first: "$unit" },
+          suppliers: {
+            $push: {
+              _id: "$supplierInfo._id",
+              name: "$supplierInfo.name"
+            }
+          }
+        }
+      },
+      {
+        $project: {
+          _id: 1,
+          name: 1,
+          price: 1,
+          quantity: 1,
+          suppliers: 1,
+          supplierCount: { $size: "$suppliers" }
+        }
+      }
+    ]);
+    return res.status(200).json({ success: true, products });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+}

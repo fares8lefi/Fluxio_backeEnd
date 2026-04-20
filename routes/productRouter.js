@@ -14,9 +14,7 @@ router.delete('/deleteProduct/:id',requireAuthUser, productController.deleteProd
 //get
 router.get('/getAllProduct',requireAuthUser, productController.getAllProduct);
 router.get('/getProductById/:id',requireAuthUser, productController.getProductById);
-router.get('/getProductByFiltres',requireAuthUser, productController.getProductByFiltres);
-router.get('/getSumProductByCategorie',requireAuthUser, productController.getSumProductByCategorie);
-router.get('/getSumProductBySupplier',requireAuthUser, productController.getSumProductBySupplier);  
+router.get('/getProductByFiltres',requireAuthUser, productController.getProductByFiltres); 
 router.get('/getProductsBySupplier',requireAuthUser, productController.getProductsBySupplier);
 router.get('/getSuppliersByProduct',requireAuthUser, productController.getSuppliersByProduct);  
 module.exports = router;

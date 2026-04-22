@@ -1,32 +1,30 @@
 const mongoose = require('mongoose');
 
-const movementItemSchema = new mongoose.Schema({
-  product: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Product',
-    required: true,
-  },
-  quantity: {
-    type: Number,
-    required: true,
-    min: 1,
-  },
-  unit_price: {
-    type: Number,
-    default: null,
-  },
-}, { _id: false });
-
 const mouvmentSchema = new mongoose.Schema({
 
   type: {
     type: String,
-    enum: ['IN', 'OUT', 'TRANSFER', 'RETURN_SUPPLIER', 'RETURN_CLIENT'],
+    enum: ['IN', 'OUT', 'RETURN_SUPPLIER', 'RETURN_CLIENT'],
     required: true,
   },
 
   items: {
-    type: [movementItemSchema],
+    type: [{
+      product: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Product',
+        required: true,
+      },
+      unit: {
+        type: Number,
+        required: true,
+        min: 1,
+      },
+      unit_price: {
+        type: Number,
+        default: null,
+      }
+    }],
     validate: v => v.length > 0,
     required: true,
   },
@@ -38,17 +36,6 @@ const mouvmentSchema = new mongoose.Schema({
   },
 
   
-  warehouse_from: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Warehouse',
-    default: null, 
-  },
-  warehouse_to: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Warehouse',
-    default: null, 
-  },
-
 
   reference: {
     type: String,

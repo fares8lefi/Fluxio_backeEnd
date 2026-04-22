@@ -97,3 +97,20 @@ module.exports.createMouvment = async (req, res) => {
         res.status(500).json({ message: error.message, success: false });
     }
 };
+
+
+
+module.exports.getAllMouvment = async(req,res)=>{
+    try{
+
+        const {numbrePage}=req.query;   
+        const mouvments = await mouvmentModel.find()
+                                              .skip((numbrePage-1)* process.env.limitByPage)
+                                              .limit(process.env.limitByPage)
+        const count = await mouvmentModel.countDocuments();
+        res.status(200).json({ message: "Mouvments fetched successfully", success: true, mouvments: mouvments,count:count });
+    }catch(error){
+        console.error(error);
+        res.status(500).json({ message: error.message, success: false });
+    }
+}

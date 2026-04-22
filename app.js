@@ -9,6 +9,8 @@ const usersRouter = require("./routes/usersRouter");
 const categorieRouter = require("./routes/categorieRouter");
 const suppliersRouter = require("./routes/suppliersRouter");
 const productRouter = require("./routes/productRouter");
+const mouvmentRouter = require("./routes/mouvmentRouter");
+
 
 const { connectToDb } = require("./config/db");
 
@@ -37,6 +39,7 @@ app.use("/api/users", usersRouter);
 app.use("/api/categories", categorieRouter);
 app.use("/api/suppliers", suppliersRouter);
 app.use("/api/products", productRouter);
+app.use("/api/mouvments", mouvmentRouter);
 
 
 app.use((req, res) => {

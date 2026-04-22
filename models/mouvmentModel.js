@@ -33,6 +33,7 @@ const mouvmentSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Suppliers',
     default: null,
+    required: true, 
   },
 
   

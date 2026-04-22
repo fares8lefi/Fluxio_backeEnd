@@ -15,6 +15,6 @@ router.delete('/deleteProduct/:id',requireAuthUser, productController.deleteProd
 router.get('/getAllProduct',requireAuthUser, productController.getAllProduct);
 router.get('/getProductById/:id',requireAuthUser, productController.getProductById);
 router.get('/getProductByFiltres',requireAuthUser, productController.getProductByFiltres); 
-router.get('/getProductsBySupplier',requireAuthUser, productController.getProductsBySupplier);
+router.get('/getProductsBySupplier',requireAuthUser, productController.getSuppliersByProduct);
 router.get('/getProductsByCategories',requireAuthUser, productController.getProductsByCategories);  
 module.exports = router;

@@ -2,7 +2,25 @@ const mongoose = require('mongoose');
 const categorieModel = require("../models/categorieModel");
 const supplierModel = require("../models/suppliersModel");
 const productModel = require("../models/productModel");
+const productService = require("../services/productService");
 const { validateProductRegistration, validateProductUpdate ,validateProductSearch} = require('../validations/ProductValidations');
+
+module.exports.create = async (req, res) => {
+ try{const  user = req.session.user;
+  const product =  await productService.addProduct(req.body)
+  res.status(201).json({ message: 'Product created successfully.' ,success :true , product})
+}catch (error){
+   console.log(error);
+   const statusCode = error.statusCode || 500;
+   return res.status(statusCode).json({
+     success: false,
+     message: error.message,
+     ...(error.details && { details: error.details }),
+   });
+ }
+
+}
+
 module.exports.addProduct = async function (req, res) {
   try {
     const validationResult = validateProductRegistration(req.body);

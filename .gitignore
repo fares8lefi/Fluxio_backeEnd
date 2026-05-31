@@ -42,7 +42,7 @@ build/Release
 node_modules/
 jspm_packages/
 Qrcodes/
-public/files
+node_modules/public/files
 # Snowpack dependency directory (https://snowpack.dev/)
 web_modules/
 

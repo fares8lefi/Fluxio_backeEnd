@@ -1,7 +1,7 @@
 var express = require('express');
 var router = express.Router();
 
-const suppliersController=require('../Controllers/suppliersController')
+const suppliersController = require('../controllers/suppliersController')
 const {requireAuthUser}= require("../middlewares/authMiddelwares");
 
 

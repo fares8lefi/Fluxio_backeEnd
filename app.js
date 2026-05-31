@@ -5,11 +5,11 @@ const logger = require("morgan");
 const session = require("express-session");
 require("dotenv").config();
 
-const usersRouter = require("./routes/usersRouter");
-const categorieRouter = require("./routes/categorieRouter");
-const suppliersRouter = require("./routes/suppliersRouter");
-const productRouter = require("./routes/productRouter");
-const mouvmentRouter = require("./routes/mouvmentRouter");
+const usersRouter = require("./src/routes/usersRouter");
+const categorieRouter = require("./src/routes/categorieRouter");
+const suppliersRouter = require("./src/routes/suppliersRouter");
+const productRouter = require("./src/routes/productRouter");
+const mouvmentRouter = require("./src/routes/mouvmentRouter");
 
 
 const { connectToDb } = require("./config/db");

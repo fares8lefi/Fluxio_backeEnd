@@ -5,10 +5,11 @@ const productModel = require("../models/productModel");
 const productService = require("../services/productService");
 const { validateProductRegistration, validateProductUpdate ,validateProductSearch} = require('../validations/ProductValidations');
 
-module.exports.create = async (req, res) => {
- try{const  user = req.session.user;
-  const product =  await productService.addProduct(req.body)
-  res.status(201).json({ message: 'Product created successfully.' ,success :true , product})
+module.exports.addProduct = async (req, res) => {
+ try{
+    const  user = req.session?.user;
+    const product =  await productService.addProduct(req.body, user)
+   res.status(201).json({ message: 'Product created successfully.' ,success :true , product})
 }catch (error){
    console.log(error);
    const statusCode = error.statusCode || 500;
@@ -21,68 +22,6 @@ module.exports.create = async (req, res) => {
 
 }
 
-module.exports.addProduct = async function (req, res) {
-  try {
-    const validationResult = validateProductRegistration(req.body);
-    if (!validationResult.isValid) {
-      return res.status(400).json({success: false, message: validationResult.errors});
-    }
-    const {
-      code,
-      barcode,
-      name,
-      purchase_price,
-      selling_price,
-      unit,
-      stock_min,
-      supplier,
-      categories,
-    } = req.body;
-
-    // Vérifier si le fournisseur existe
-    if (supplier) {
-      if (!mongoose.Types.ObjectId.isValid(supplier)) {
-        return res.status(400).json({ success: false, message: "Format d'ID fournisseur invalide" });
-      }
-      const supplierExists = await supplierModel.findById(supplier);
-      if (!supplierExists) {
-        return res.status(400).json({ success: false, message: "Fournisseur introuvable" });
-      }
-    }
-
-    // Vérifier si les catégories existent
-    if (categories && Array.isArray(categories)) {
-      for (const catId of categories) {
-        if (!mongoose.Types.ObjectId.isValid(catId)) {
-          return res.status(400).json({ success: false, message: `Format d'ID catégorie invalide : ${catId}` });
-        }
-        const catExists = await categorieModel.findById(catId);
-        if (!catExists) {
-          return res.status(400).json({ success: false, message: `Catégorie introuvable : ${catId}` });
-        }
-      }
-    }
-
-    const newProduct = await productModel.create({
-      code,
-      barcode,
-      name,
-      purchase_price,
-      selling_price,
-      unit,
-      stock_min,
-      supplier: supplier || null,
-      categories: categories || [],
-    });
-
-    return res
-      .status(201)
-      .json({ success: true, message: "Produit ajouté avec succès", product: newProduct });
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: error.message });
-  }
-};
 
 module.exports.deleteProduct = async function (req, res) {
   try {

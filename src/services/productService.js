@@ -5,8 +5,13 @@ const categoryModel = require('../models/categorieModel');
 const productValidations = require('../validations/ProductValidations');
 
 
-const addProduct= async(data)=> {
-
+const addProduct= async(data , user)=> {
+    if(!user){
+            const error = new Error('user not authenticated');
+            error.statusCode = 400;
+            error.details = validationResult.errors;
+            throw error;
+    }
     const validationResult = await productValidations.validateProductRegistration(data);
     if (!validationResult.isValid) {
         const error = new Error('Validation échouée');
@@ -30,6 +35,8 @@ const addProduct= async(data)=> {
     }
     return await productRepoitory.addProduct({code, barcode, name, purchase_price, selling_price, unit, stock_min, upplier, categories});
 }
+
+
 
 module.exports = {
     addProduct

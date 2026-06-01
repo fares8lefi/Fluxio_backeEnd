@@ -5,7 +5,7 @@ const { requireAuthUser } = require('../middlewares/authMiddelwares');
 
 
 //post
-router.post('/addProduct', requireAuthUser, productController.addProduct);
+router.post('/addProduct', productController.addProduct);
 
 //put
 router.put('/updateProduct/:id',requireAuthUser, productController.updateProduct);

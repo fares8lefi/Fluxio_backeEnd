@@ -2,16 +2,12 @@ const productRepoitory = require('../repositories/prdouctRepository');
 const productModel = require('../models/productModel');
 const supplierModel = require('../models/suppliersModel');
 const categoryModel = require('../models/categorieModel');
+
 const productValidations = require('../validations/ProductValidations');
 
 
 const addProduct= async(data , user)=> {
-    if(!user){
-            const error = new Error('user not authenticated');
-            error.statusCode = 400;
-            error.details = validationResult.errors;
-            throw error;
-    }
+
     const validationResult = await productValidations.validateProductRegistration(data);
     if (!validationResult.isValid) {
         const error = new Error('Validation échouée');
@@ -37,7 +33,21 @@ const addProduct= async(data , user)=> {
 }
 
 
+const deleteProduct= async(data )=> {
+    const verifProduct = await productModel.findById(data);
+    if(!data){
+        const error = new Error('product not found ');
+        error.statusCode = 400;
+        throw error;
+    }
+    return await productRepoitory.deleteProduct(data);
+}
 
+const getAllProducts = async()=>{
+    return await productRepoitory.getAllProduct();
+}
 module.exports = {
-    addProduct
+    addProduct,
+    deleteProduct,
+    getAllProducts,
 }

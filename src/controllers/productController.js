@@ -25,17 +25,26 @@ module.exports.addProduct = async (req, res) => {
 
 module.exports.deleteProduct = async function (req, res) {
   try {
-    const id = req.params.id;
-    const verifId = await productModel.findById(id);
-    if (!verifId) {
-      return res.status(404).json({ success: false, message: "produit non trouvé" });
-    }
-    await productModel.findByIdAndDelete(id);
+    const deleteResult = await productService.deleteProduct(req.params.id);
+
     return res.status(200).json({ success: true, message: "Produit supprimé avec succès" });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
+
+module.exports.product = async (req, res) => {
+  try {
+    const product = await productService.getAllProducts()
+    res.status(200).json(product);
+  }catch(error){
+    console.log(error);
+    const statusCode = error.statusCode || 500;
+    return res.status(statusCode).json({
+      success: false,
+      message: error.message,})
+  }
+}
 
 module.exports.getAllProduct = async function (req, res) {
   try {

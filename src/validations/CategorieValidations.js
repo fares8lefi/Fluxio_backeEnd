@@ -1,54 +1,82 @@
-const validator = require('validator');
+const { z } = require('zod');
 
-/** 
- * Validates user registration data.
- * @param {Object} data - The user data to validate.
- * @returns {Object} An object containing errors and a boolean indicating validity.
+// ─── Schemas ────────────────────────────────────────────────────────────────
+
+const categorieRegistrationSchema = z.object({
+    name: z
+        .string({ required_error: 'Name is required' })
+        .trim()
+        .min(1, 'Name is required'),
+
+    description: z
+        .string({ required_error: 'Description is required' })
+        .trim()
+        .min(1, 'Description is required'),
+});
+
+const categorieUpdateSchema = z.object({
+    name: z
+        .string()
+        .trim()
+        .min(1, 'Name cannot be empty')
+        .optional(),
+
+    code: z
+        .string()
+        .trim()
+        .min(1, 'Code cannot be empty')
+        .optional(),
+
+    description: z
+        .string()
+        .trim()
+        .min(1, 'Description cannot be empty')
+        .optional(),
+});
+
+// ─── Helper ──────────────────────────────────────────────────────────────────
+
+/**
+ * Parse a Zod result into the legacy { errors, isValid } format.
+ * @param {import('zod').SafeParseReturnType} result
+ * @returns {{ errors: Object, isValid: boolean }}
  */
-const validateCategorieRegistration = (data) => {
-    let errors = {};
-
-    const { name, description } = data;
-
-    // Username validation
-    if (!name || validator.isEmpty(String(name).trim())) {
-        errors.name = 'Name is required';
+const formatResult = (result) => {
+    if (result.success) {
+        return { errors: {}, isValid: true };
     }
-
-    // Email validation
-    if (!description || validator.isEmpty(String(description).trim())) {
-        errors.description = 'Description is required';
-    }
-
-    return {
-        errors,
-        isValid: Object.keys(errors).length === 0
-    };
+    const errors = {};
+    result.error.issues.forEach(({ path, message }) => {
+        const key = path[0];
+        if (key && !errors[key]) {
+            errors[key] = message;
+        }
+    });
+    return { errors, isValid: false };
 };
 
-const validateCategorieUpdate = (data) => {
-    let errors = {};
-    const { name, code, description } = data;
+// ─── Exported validators ─────────────────────────────────────────────────────
 
-    if (name !== undefined && validator.isEmpty(String(name).trim())) {
-        errors.name = 'Name cannot be empty';
-    }
+/**
+ * Valide les données de création d'une catégorie.
+ * @param {Object} data
+ * @returns {{ errors: Object, isValid: boolean }}
+ */
+const validateCategorieRegistration = (data) =>
+    formatResult(categorieRegistrationSchema.safeParse(data));
 
-    if (code !== undefined && validator.isEmpty(String(code).trim())) {
-        errors.code = 'Code cannot be empty';
-    }
-
-    if (description !== undefined && validator.isEmpty(String(description).trim())) {
-        errors.description = 'Description cannot be empty';
-    }
-
-    return {
-        errors,
-        isValid: Object.keys(errors).length === 0
-    };
-};
+/**
+ * Valide les données de mise à jour d'une catégorie.
+ * @param {Object} data
+ * @returns {{ errors: Object, isValid: boolean }}
+ */
+const validateCategorieUpdate = (data) =>
+    formatResult(categorieUpdateSchema.safeParse(data));
 
 module.exports = {
     validateCategorieRegistration,
-    validateCategorieUpdate
-};  
+    validateCategorieUpdate,
+    // Expose schemas for reuse / testing
+    categorieRegistrationSchema,
+    categorieUpdateSchema,
+};

@@ -1,72 +1,99 @@
-const validator = require('validator');
+const { z } = require('zod');
 
-/** 
- * Validates user registration data.
- * @param {Object} data - The user data to validate.
- * @returns {Object} An object containing errors and a boolean indicating validity.
+// ─── Schemas ────────────────────────────────────────────────────────────────
+
+const supplierRegistrationSchema = z.object({
+    name: z
+        .string({ required_error: 'Name is required' })
+        .trim()
+        .min(1, 'Name is required'),
+
+    email: z
+        .string({ required_error: 'Email is required' })
+        .trim()
+        .min(1, 'Email is required')
+        .email('Email is invalid'),
+
+    phone: z
+        .string({ required_error: 'Phone is required' })
+        .trim()
+        .min(1, 'Phone is required'),
+
+    address: z
+        .string({ required_error: 'Address is required' })
+        .trim()
+        .min(1, 'Address is required'),
+});
+
+const supplierUpdateSchema = z.object({
+    name: z
+        .string()
+        .trim()
+        .min(1, 'Name is required if provided')
+        .optional(),
+
+    email: z
+        .string()
+        .trim()
+        .email('Email is invalid')
+        .optional(),
+
+    phone: z
+        .string()
+        .trim()
+        .min(1, 'Phone is required if provided')
+        .optional(),
+
+    address: z
+        .string()
+        .trim()
+        .min(1, 'Address is required if provided')
+        .optional(),
+});
+
+// ─── Helper ──────────────────────────────────────────────────────────────────
+
+/**
+ * Parse a Zod result into the legacy { errors, isValid } format.
+ * @param {import('zod').SafeParseReturnType} result
+ * @returns {{ errors: Object, isValid: boolean }}
  */
-const validateSupplierRegistration = (data) => {
-    let errors = {};
-    const { name, email, phone, address } = data;
-
-    if (!name || validator.isEmpty(String(name).trim())) {
-        errors.name = 'Name is required';
+const formatResult = (result) => {
+    if (result.success) {
+        return { errors: {}, isValid: true };
     }
-
-    if (!email || validator.isEmpty(String(email).trim())) {
-        errors.email = 'Email is required';
-    } else if (!validator.isEmail(email)) {
-        errors.email = 'Email is invalid';
-    }
-
-    if (!phone || validator.isEmpty(String(phone).trim())) {
-        errors.phone = 'Phone is required';
-    }
-
-    if (!address || validator.isEmpty(String(address).trim())) {
-        errors.address = 'Address is required';
-    }
-
-    return {
-        errors,
-        isValid: Object.keys(errors).length === 0
-    };
+    const errors = {};
+    result.error.issues.forEach(({ path, message }) => {
+        const key = path[0];
+        if (key && !errors[key]) {
+            errors[key] = message;
+        }
+    });
+    return { errors, isValid: false };
 };
 
+// ─── Exported validators ─────────────────────────────────────────────────────
 
-/** 
- * Validates user registration data.
- * @param {Object} data - The user data to validate.
- * @returns {Object} An object containing errors and a boolean indicating validity.
+/**
+ * Valide les données de création d'un fournisseur.
+ * @param {Object} data
+ * @returns {{ errors: Object, isValid: boolean }}
  */
+const validateSupplierRegistration = (data) =>
+    formatResult(supplierRegistrationSchema.safeParse(data));
 
-const validateSupplierUpdate = (data) => {
-    let errors = {};
-    const { name, email, phone, address } = data;
-
-    if (name !== undefined && validator.isEmpty(String(name).trim())) {
-        errors.name = 'Name is required if provided';
-    }
-
-    if (email && !validator.isEmail(email)) {
-        errors.email = 'Email is invalid';
-    }
-
-    if (phone !== undefined && validator.isEmpty(String(phone).trim())) {
-        errors.phone = 'Phone is required if provided';
-    }
-
-    if (address !== undefined && validator.isEmpty(String(address).trim())) {
-        errors.address = 'Address is required if provided';
-    }
-
-    return {
-        errors,
-        isValid: Object.keys(errors).length === 0
-    };
-};
+/**
+ * Valide les données de mise à jour d'un fournisseur.
+ * @param {Object} data
+ * @returns {{ errors: Object, isValid: boolean }}
+ */
+const validateSupplierUpdate = (data) =>
+    formatResult(supplierUpdateSchema.safeParse(data));
 
 module.exports = {
     validateSupplierRegistration,
-    validateSupplierUpdate
-};  
+    validateSupplierUpdate,
+    // Expose schemas for reuse / testing
+    supplierRegistrationSchema,
+    supplierUpdateSchema,
+};

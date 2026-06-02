@@ -1,103 +1,154 @@
-const validator = require('validator');
+const { z } = require('zod');
 
-/** 
- * Valide les données de création d'un mouvement.
+// ─── Sub-schemas ─────────────────────────────────────────────────────────────
+
+/** Regex simple pour valider un MongoID (24 hex chars) */
+const mongoIdRegex = /^[a-f\d]{24}$/i;
+
+const mouvmentItemSchema = z.object({
+    product: z
+        .string({ required_error: 'Le produit est requis' })
+        .trim()
+        .regex(mongoIdRegex, 'Le produit doit être un MongoID valide'),
+
+    unit: z
+        .number({ required_error: 'La quantité est requise', invalid_type_error: 'La quantité doit être un nombre entier' })
+        .int('La quantité doit être un nombre entier')
+        .min(1, 'La quantité doit être au minimum 1'),
+
+    unit_price: z
+        .number({ invalid_type_error: 'Le prix unitaire doit être un nombre positif' })
+        .min(0, 'Le prix unitaire doit être un nombre positif')
+        .optional()
+        .nullable(),
+});
+
+// ─── Schemas ────────────────────────────────────────────────────────────────
+
+const mouvmentRegistrationSchema = z.object({
+    type: z.enum(
+        ['IN', 'OUT', 'RETURN_SUPPLIER', 'RETURN_CLIENT'],
+        {
+            required_error: 'Le type de mouvement est requis',
+            invalid_type_error:
+                'Le type de mouvement est invalide. Valeurs acceptées: IN, OUT, RETURN_SUPPLIER, RETURN_CLIENT.',
+        }
+    ),
+
+    items: z
+        .array(mouvmentItemSchema, { required_error: 'Au moins un article est requis' })
+        .min(1, 'Au moins un article est requis'),
+
+    created_by: z
+        .string({ required_error: "L'ID de l'utilisateur créateur est requis (created_by)" })
+        .trim()
+        .regex(mongoIdRegex, "L'ID du créateur est invalide"),
+
+    supplier: z
+        .string()
+        .trim()
+        .regex(mongoIdRegex, "L'ID du fournisseur est invalide")
+        .optional()
+        .nullable(),
+
+    status: z
+        .enum(
+            ['PENDING', 'CONFIRMED', 'CANCELLED'],
+            {
+                invalid_type_error:
+                    'Le statut est invalide. Valeurs acceptées: PENDING, CONFIRMED, CANCELLED.',
+            }
+        )
+        .optional(),
+
+    reference: z.string().trim().optional().nullable(),
+
+    note: z.string().trim().optional().nullable(),
+});
+
+const mouvmentUpdateSchema = z.object({
+    type: z
+        .enum(
+            ['IN', 'OUT', 'RETURN_SUPPLIER', 'RETURN_CLIENT'],
+            {
+                invalid_type_error:
+                    'Le type de mouvement est invalide. Valeurs acceptées: IN, OUT, RETURN_SUPPLIER, RETURN_CLIENT.',
+            }
+        )
+        .optional(),
+
+    items: z
+        .array(mouvmentItemSchema)
+        .min(1, 'Au moins un article est requis si les articles sont modifiés')
+        .optional(),
+
+    supplier: z
+        .string()
+        .trim()
+        .regex(mongoIdRegex, "L'ID du fournisseur est invalide")
+        .optional()
+        .nullable(),
+
+    status: z
+        .enum(
+            ['PENDING', 'CONFIRMED', 'CANCELLED'],
+            {
+                invalid_type_error:
+                    'Le statut est invalide. Valeurs acceptées: PENDING, CONFIRMED, CANCELLED.',
+            }
+        )
+        .optional(),
+
+    reference: z.string().trim().optional().nullable(),
+
+    note: z.string().trim().optional().nullable(),
+});
+
+// ─── Helper ──────────────────────────────────────────────────────────────────
+
+/**
+ * Parse a Zod result into the legacy { errors, isValid } format.
+ * @param {import('zod').SafeParseReturnType} result
+ * @returns {{ errors: Object, isValid: boolean }}
  */
-const validateMouvmentRegistration = (data) => {
-    let errors = {};
-
-    const { type, items, supplier, created_by, status, reference, note } = data;
-
-    if (!type || validator.isEmpty(String(type).trim())) {
-        errors.type = 'Le type de mouvement est requis';
-    } else if (!['IN', 'OUT', 'RETURN_SUPPLIER', 'RETURN_CLIENT'].includes(type)) {
-        errors.type = 'Le type de mouvement est invalide. Valeurs acceptées: IN, OUT, RETURN_SUPPLIER, RETURN_CLIENT.';
+const formatResult = (result) => {
+    if (result.success) {
+        return { errors: {}, isValid: true };
     }
-
-    if (!items || !Array.isArray(items) || items.length === 0) {
-        errors.items = 'Au moins un article est requis';
-    } else {
-        const hasInvalidItem = items.some(item => 
-            !item.product || validator.isEmpty(String(item.product).trim()) || !validator.isMongoId(String(item.product)) ||
-            item.unit === undefined || !validator.isInt(String(item.unit), { min: 1 }) ||
-            (item.unit_price !== undefined && item.unit_price !== null && !validator.isEmpty(String(item.unit_price).trim()) && !validator.isFloat(String(item.unit_price), { min: 0 }))
-        );
-        if (hasInvalidItem) {
-            errors.items = 'Chaque article doit avoir un produit valide (MongoID), une unité/quantité (minimum 1) et un prix unitaire optionnellement positif';
+    const errors = {};
+    result.error.issues.forEach(({ path, message }) => {
+        // path peut être ['items', 0, 'product'] → on remonte au premier segment
+        const key = path[0];
+        if (key !== undefined && !errors[key]) {
+            errors[key] = message;
         }
-    }
-
-    if (!created_by || validator.isEmpty(String(created_by).trim())) {
-        errors.created_by = "L'ID de l'utilisateur créateur est requis (created_by)";
-    } else if (!validator.isMongoId(String(created_by))) {
-        errors.created_by = "L'ID du créateur est invalide";
-    }
-
-    if (supplier !== undefined && supplier !== null && !validator.isEmpty(String(supplier).trim()) && !validator.isMongoId(String(supplier))) {
-        errors.supplier = "L'ID du fournisseur est invalide";
-    }
-
-    if (status !== undefined && status !== null && validator.isEmpty(String(status).trim()) === false) {
-        if (!['PENDING', 'CONFIRMED', 'CANCELLED'].includes(status)) {
-            errors.status = 'Le statut est invalide. Valeurs acceptées: PENDING, CONFIRMED, CANCELLED.';
-        }
-    }
-
-    return {
-        errors,
-        isValid: Object.keys(errors).length === 0
-    };
+    });
+    return { errors, isValid: false };
 };
+
+// ─── Exported validators ─────────────────────────────────────────────────────
+
+/**
+ * Valide les données de création d'un mouvement.
+ * @param {Object} data
+ * @returns {{ errors: Object, isValid: boolean }}
+ */
+const validateMouvmentRegistration = (data) =>
+    formatResult(mouvmentRegistrationSchema.safeParse(data));
 
 /**
  * Valide les données de mise à jour d'un mouvement.
+ * @param {Object} data
+ * @returns {{ errors: Object, isValid: boolean }}
  */
-const validateMouvmentUpdate = (data) => {
-    let errors = {};
-    const { type, items, supplier, status, reference, note } = data;
-
-    if (type !== undefined) {
-        if (validator.isEmpty(String(type).trim())) {
-             errors.type = 'Le type ne peut pas être vide';
-        } else if (!['IN', 'OUT', 'RETURN_SUPPLIER', 'RETURN_CLIENT'].includes(type)) {
-            errors.type = 'Le type de mouvement est invalide. Valeurs acceptées: IN, OUT, RETURN_SUPPLIER, RETURN_CLIENT.';
-        }
-    }
-
-    if (items !== undefined) {
-        if (!Array.isArray(items) || items.length === 0) {
-            errors.items = 'Au moins un article est requis si les articles sont modifiés';
-        } else {
-            const hasInvalidItem = items.some(item => 
-                !item.product || validator.isEmpty(String(item.product).trim()) || !validator.isMongoId(String(item.product)) ||
-                item.unit === undefined || !validator.isInt(String(item.unit), { min: 1 }) ||
-                (item.unit_price !== undefined && item.unit_price !== null && !validator.isEmpty(String(item.unit_price).trim()) && !validator.isFloat(String(item.unit_price), { min: 0 }))
-            );
-            if (hasInvalidItem) {
-                errors.items = 'Certains articles sont invalides (produit requis (MongoID), unité >= 1, prix unitaire optionnel positif)';
-            }
-        }
-    }
-
-    if (supplier !== undefined && supplier !== null && !validator.isEmpty(String(supplier).trim()) && !validator.isMongoId(String(supplier))) {
-        errors.supplier = "L'ID du fournisseur est invalide";
-    }
-
-    if (status !== undefined) {
-         if (validator.isEmpty(String(status).trim())) {
-              errors.status = 'Le statut ne peut pas être vide';
-         } else if (!['PENDING', 'CONFIRMED', 'CANCELLED'].includes(status)) {
-            errors.status = 'Le statut est invalide. Valeurs acceptées: PENDING, CONFIRMED, CANCELLED.';
-        }
-    }
-
-    return {
-        errors,
-        isValid: Object.keys(errors).length === 0
-    };
-};
+const validateMouvmentUpdate = (data) =>
+    formatResult(mouvmentUpdateSchema.safeParse(data));
 
 module.exports = {
     validateMouvmentRegistration,
-    validateMouvmentUpdate
+    validateMouvmentUpdate,
+    // Expose schemas for reuse / testing
+    mouvmentRegistrationSchema,
+    mouvmentUpdateSchema,
+    mouvmentItemSchema,
 };

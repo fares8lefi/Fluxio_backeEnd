@@ -1,146 +1,165 @@
-const validator = require('validator');
+const { z } = require('zod');
 
-/** 
- * Valide les données de création d'un produit.
+// ─── Schemas ────────────────────────────────────────────────────────────────
+
+const productRegistrationSchema = z.object({
+    code: z
+        .union([z.string(), z.number()])
+        .transform((v) => String(v).trim())
+        .refine((v) => v.length > 0, { message: 'Le code est requis' })
+        .refine((v) => /^\d+$/.test(v), { message: 'Le code doit être un nombre entier' }),
+
+    barcode: z
+        .union([z.string(), z.number()])
+        .transform((v) => String(v).trim())
+        .refine((v) => v.length > 0, { message: 'Le code-barres est requis' })
+        .refine((v) => /^\d+$/.test(v), { message: 'Le code-barres doit être un nombre entier' }),
+
+    name: z
+        .string({ required_error: 'Le nom est requis' })
+        .trim()
+        .min(1, 'Le nom est requis'),
+
+    purchase_price: z
+        .number({ required_error: "Le prix d'achat est requis", invalid_type_error: "Le prix d'achat doit être un nombre positif" })
+        .min(0, "Le prix d'achat doit être un nombre positif"),
+
+    selling_price: z
+        .number({ required_error: 'Le prix de vente est requis', invalid_type_error: 'Le prix de vente doit être un nombre positif' })
+        .min(0, 'Le prix de vente doit être un nombre positif'),
+
+    unit: z
+        .number({ required_error: "L'unité/quantité est requise", invalid_type_error: "L'unité doit être un nombre entier positif" })
+        .int("L'unité doit être un nombre entier positif")
+        .min(0, "L'unité doit être un nombre entier positif"),
+
+    stock_min: z
+        .number({ required_error: 'Le stock minimum est requis', invalid_type_error: 'Le stock minimum doit être un nombre entier positif' })
+        .int('Le stock minimum doit être un nombre entier positif')
+        .min(0, 'Le stock minimum doit être un nombre entier positif'),
+});
+
+const productUpdateSchema = z.object({
+    code: z
+        .union([z.string(), z.number()])
+        .transform((v) => String(v).trim())
+        .refine((v) => v.length > 0, { message: 'Le code ne peut pas être vide' })
+        .refine((v) => /^\d+$/.test(v), { message: 'Le code doit être un nombre entier' })
+        .optional(),
+
+    barcode: z
+        .union([z.string(), z.number()])
+        .transform((v) => String(v).trim())
+        .refine((v) => v.length > 0, { message: 'Le code-barres ne peut pas être vide' })
+        .refine((v) => /^\d+$/.test(v), { message: 'Le code-barres doit être un nombre entier' })
+        .optional(),
+
+    name: z
+        .string()
+        .trim()
+        .min(1, 'Le nom ne peut pas être vide')
+        .optional(),
+
+    purchase_price: z
+        .number({ invalid_type_error: "Le prix d'achat doit être un nombre positif" })
+        .min(0, "Le prix d'achat doit être un nombre positif")
+        .optional(),
+
+    selling_price: z
+        .number({ invalid_type_error: 'Le prix de vente doit être un nombre positif' })
+        .min(0, 'Le prix de vente doit être un nombre positif')
+        .optional(),
+
+    unit: z
+        .number({ invalid_type_error: "L'unité doit être un nombre entier positif" })
+        .int("L'unité doit être un nombre entier positif")
+        .min(0, "L'unité doit être un nombre entier positif")
+        .optional(),
+
+    stock_min: z
+        .number({ invalid_type_error: 'Le stock minimum doit être un nombre entier positif' })
+        .int('Le stock minimum doit être un nombre entier positif')
+        .min(0, 'Le stock minimum doit être un nombre entier positif')
+        .optional(),
+});
+
+const productSearchSchema = z.object({
+    name: z
+        .string()
+        .trim()
+        .min(1, 'Le nom ne peut pas être vide')
+        .optional(),
+
+    unit: z
+        .number({ invalid_type_error: "L'unité doit être un nombre entier" })
+        .int("L'unité doit être un nombre entier")
+        .min(0, "L'unité doit être un nombre entier positif")
+        .optional(),
+
+    maxPrice: z
+        .number({ invalid_type_error: 'Le prix maximum doit être un nombre positif' })
+        .min(0, 'Le prix maximum doit être un nombre positif')
+        .optional(),
+
+    minPrice: z
+        .number({ invalid_type_error: 'Le prix minimum doit être un nombre positif' })
+        .min(0, 'Le prix minimum doit être un nombre positif')
+        .optional(),
+});
+
+// ─── Helper ──────────────────────────────────────────────────────────────────
+
+/**
+ * Parse a Zod result into the legacy { errors, isValid } format.
+ * @param {import('zod').SafeParseReturnType} result
+ * @returns {{ errors: Object, isValid: boolean }}
  */
-const validateProductRegistration = (data) => {
-    let errors = {};
-
-    const { code, barcode, name, purchase_price, selling_price, unit, stock_min } = data;
-
-    if (!code || validator.isEmpty(String(code).trim())) {
-        errors.code = 'Le code est requis';
-    } else if (!validator.isInt(String(code))) {
-        errors.code = 'Le code doit être un nombre entier';
+const formatResult = (result) => {
+    if (result.success) {
+        return { errors: {}, isValid: true };
     }
-
-    if (!barcode || validator.isEmpty(String(barcode).trim())) {
-        errors.barcode = 'Le code-barres est requis';
-    } else if (!validator.isInt(String(barcode))) {
-        errors.barcode = 'Le code-barres doit être un nombre entier';
-    }
-
-    if (!name || validator.isEmpty(String(name).trim())) {
-        errors.name = 'Le nom est requis';
-    }
-
-    if (purchase_price === undefined || validator.isEmpty(String(purchase_price).trim())) {
-        errors.purchase_price = 'Le prix d\'achat est requis';
-    } else if (!validator.isFloat(String(purchase_price), { min: 0 })) {
-        errors.purchase_price = 'Le prix d\'achat doit être un nombre positif';
-    }
-
-    if (selling_price === undefined || validator.isEmpty(String(selling_price).trim())) {
-        errors.selling_price = 'Le prix de vente est requis';
-    } else if (!validator.isFloat(String(selling_price), { min: 0 })) {
-        errors.selling_price = 'Le prix de vente doit être un nombre positif';
-    }
-
-    if (unit === undefined || validator.isEmpty(String(unit).trim())) {
-        errors.unit = 'L\'unité/quantité est requise';
-    } else if (!validator.isInt(String(unit), { min: 0 })) {
-        errors.unit = 'L\'unité doit être un nombre entier positif';
-    }
-
-    if (stock_min === undefined || validator.isEmpty(String(stock_min).trim())) {
-        errors.stock_min = 'Le stock minimum est requis';
-    } else if (!validator.isInt(String(stock_min), { min: 0 })) {
-        errors.stock_min = 'Le stock minimum doit être un nombre entier positif';
-    }
-
-    return {
-        errors,
-        isValid: Object.keys(errors).length === 0
-    };
+    const errors = {};
+    result.error.issues.forEach(({ path, message }) => {
+        const key = path[0];
+        if (key && !errors[key]) {
+            errors[key] = message;
+        }
+    });
+    return { errors, isValid: false };
 };
+
+// ─── Exported validators ─────────────────────────────────────────────────────
+
+/**
+ * Valide les données de création d'un produit.
+ * @param {Object} data
+ * @returns {{ errors: Object, isValid: boolean }}
+ */
+const validateProductRegistration = (data) =>
+    formatResult(productRegistrationSchema.safeParse(data));
 
 /**
  * Valide les données de mise à jour d'un produit.
+ * @param {Object} data
+ * @returns {{ errors: Object, isValid: boolean }}
  */
-const validateProductUpdate = (data) => {
-    let errors = {};
-    const { code, barcode, name, purchase_price, selling_price, unit, stock_min } = data;
+const validateProductUpdate = (data) =>
+    formatResult(productUpdateSchema.safeParse(data));
 
-    if (code !== undefined && validator.isEmpty(String(code).trim())) {
-        errors.code = 'Le code ne peut pas être vide';
-    } else if (code !== undefined && !validator.isInt(String(code))) {
-        errors.code = 'Le code doit être un nombre entier';
-    }
-
-    if (barcode !== undefined && validator.isEmpty(String(barcode).trim())) {
-        errors.barcode = 'Le code-barres ne peut pas être vide';
-    } else if (barcode !== undefined && !validator.isInt(String(barcode))) {
-        errors.barcode = 'Le code-barres doit être un nombre entier';
-    }
-
-    if (name !== undefined && validator.isEmpty(String(name).trim())) {
-        errors.name = 'Le nom ne peut pas être vide';
-    }
-
-    if (purchase_price !== undefined) {
-        if (!validator.isFloat(String(purchase_price), { min: 0 })) {
-            errors.purchase_price = 'Le prix d\'achat doit être un nombre positif';
-        }
-    }
-
-    if (selling_price !== undefined) {
-        if (!validator.isFloat(String(selling_price), { min: 0 })) {
-            errors.selling_price = 'Le prix de vente doit être un nombre positif';
-        }
-    }
-
-    if (unit !== undefined) {
-        if (!validator.isInt(String(unit), { min: 0 })) {
-            errors.unit = 'L\'unité doit être un nombre entier positif';
-        }
-    }
-
-    if (stock_min !== undefined) {
-        if (!validator.isInt(String(stock_min), { min: 0 })) {
-            errors.stock_min = 'Le stock minimum doit être un nombre entier positif';
-        }
-    }
-
-    return {
-        errors,
-        isValid: Object.keys(errors).length === 0
-    };
-};
-
-const validateProductSearch = (data) => {
-    const{name,unit,maxPrice,minPrice} = data;
-    let errors={}
-    if (name !== undefined && validator.isEmpty(String(name).trim())) {
-        errors.name='Le nom ne peut pas être vide';
-    }
-    if (unit !== undefined && validator.isEmpty(String(unit).trim())) {
-        errors.unit='Le code ne peut pas être vide';
-    } else if (code !== undefined && !validator.isInt(String(unit))) {
-        errors.unit='Le code doit être un nombre entier';
-    }
-    if (maxPrice !== undefined && validator.isEmpty(String(maxPrice).trim())) {
-        errors.maxPrice='Le prix maximum ne peut pas être vide';
-    } else if (maxPrice !== undefined && !validator.isFloat(String(maxPrice), { min: 0 })) {
-        errors.maxPrice='Le prix maximum doit être un nombre positif';
-    }
-    if (minPrice !== undefined && validator.isEmpty(String(minPrice).trim())) {
-        errors.minPrice='Le prix minimum ne peut pas être vide';
-    } else if (minPrice !== undefined && !validator.isFloat(String(minPrice), { min: 0 })) {
-        errors.minPrice='Le prix minimum doit être un nombre positif';
-    }
-    return {
-        errors,
-        isValid: Object.keys(errors).length === 0
-    };
-}
-
-    
-
-
-
+/**
+ * Valide les critères de recherche d'un produit.
+ * @param {Object} data
+ * @returns {{ errors: Object, isValid: boolean }}
+ */
+const validateProductSearch = (data) =>
+    formatResult(productSearchSchema.safeParse(data));
 
 module.exports = {
     validateProductRegistration,
     validateProductUpdate,
-    validateProductSearch
+    validateProductSearch,
+    // Expose schemas for reuse / testing
+    productRegistrationSchema,
+    productUpdateSchema,
+    productSearchSchema,
 };

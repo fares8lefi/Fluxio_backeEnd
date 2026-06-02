@@ -1,284 +1,155 @@
-const userModel = require('../models/userModel');
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcrypt');
-const {sendEmailVerificationCode,sendEmailResetCode}=require('../services/SendEmail');
-const { validateUserRegistration, validateUserUpdate, validatePassword, validateLogin } = require('../validations/USerValidations');
+const userService = require('../services/userService');
 
-const maxTime = 240 * 60 * 60;
-const createToken = (id) => {
-    
-    const expiresIn =maxTime;
-    return jwt.sign({ id }, process.env.net_Secret, { expiresIn });
-};
-module.exports.createUser =async(req,res) =>{
-    try{
-            const { errors, isValid } = validateUserRegistration(req.body);
-
-            if (!isValid) {
-                return res.status(400).json({ errors, success: false });
-            }
-            
-            const {username,password,phone,email}=req.body;
-
-            const code = Math.floor(1000 + Math.random() * 9000);
-            console.log("code ====",code)
-            await Promise.all([
-                
-               userModel.create(
-                {
-                    username,
-                    email,
-                    password,
-                    phone,
-                    code,
-                    is_active: false,
-                }
-            ),
-            sendEmailVerificationCode(email, username, code),
-
-            ])
-         res.status(200).json({message :"code has been sent to your email" ,success:true})   
-    }catch(err){
-        console.log(err);
-        res.status(500).json({error:err.message})
-    }
-}
-module.exports.verifyAccounts=async (req,res)=>{
-    try{
-        const{email,code}=req.body;
-        const user= await userModel.findOne({email}).select('-password')
-        if(!user){
-            return res.status(404).json({message:"user not found"})
-        }
-        if(user.code !== code){
-            return res.status(400).json({message:"invalid code"})
-        }
-        user.is_active = true;
-        user.code = null;
-        await user.save();
-        res.status(200).json({message:"user verified successfully"})
-    }catch(error){
-         res.status(500).json({message: error.message})
-    }
-}
-
-module.exports.resendCode=async(req,res)=>{
-    try{
-        const{email}=req.body;
-        const user= await userModel.findOne({email}).select('-password')
-        if(!user){
-            return res.status(404).json({message:"user not found"})
-        }
-        const code = Math.floor(1000 + Math.random() * 9000);
-        user.code = code;
-        await user.save();
-        await sendEmailVerificationCode(email, user.username, code);
-        res.status(200).json({message:"code has been sent to your email" ,success:true})
-    }catch(error){
-        res.status(500).json({message: error.message})
-    }
-}
-module.exports.foorgetPasswordVerifyCode=async(req,res)=>{
-    try{
-        const {email , newPassword}=req.body;
-        const { errors, isValid } = validatePassword(newPassword);
-        if (!isValid) {
-            return res.status(400).json({ errors, success: false });
-        }
-
-        const user= await userModel.findOne({email}).select("-password")
-        if(!user){
-            return res.status(404).json({message: "User not found"})
-        }
-        const code =Math.floor(1000+ Math.random()*9000)
-        user.code=code
-        await user.save()
-        await sendEmailResetCode(email,user.username,code)
-        
-        const salt = await bcrypt.genSalt();
-        const hashedPassword = await bcrypt.hash(newPassword, salt)
-        
-        await userModel.findByIdAndUpdate(user._id, {
-            password: hashedPassword
-        })
-        res.status(200).json({message:"password has been changed successfully" ,success:true})
-    }catch(error){
-        res.status(500).json({message: error.message})
-    }
-}
-
-
-
-module.exports.loginUser=async(req, res)=>{
-   try{ 
-    const { errors, isValid } = validateLogin(req.body);
-
-    if (!isValid) {
-        return res.status(400).json({ errors, success: false });
-    }
-
-    const {email,password}=req.body;
-    const user =await userModel.login(email,password);
-
-    const token = createToken(user._id);
-             
-             res.cookie("jwt_login", token, {
-            httpOnly: true,
-            maxAge: maxTime,
+module.exports.createUser = async (req, res) => {
+    try {
+        await userService.createUser(req.body);
+        return res.status(200).json({ message: "code has been sent to your email", success: true });
+    } catch (error) {
+        console.error(error);
+        const statusCode = error.statusCode || 500;
+        return res.status(statusCode).json({ 
+            success: false, 
+            message: error.message,
+            ...(error.details && { errors: error.details })
         });
-    
-    await userModel.findByIdAndUpdate(user._id, { last_login: new Date() });
-    res.status(200).json({
-      success: true,
-      user: {
-        id: user._id,
-        email: user.email,
-        role: user.role,
-        status: user.status,
-      },
-      token, 
-    })
-  } catch (error) {
-    res.status(500).json({message: error.message})
-  }
-}
+    }
+};
 
+module.exports.verifyAccounts = async (req, res) => {
+    try {
+        const { email, code } = req.body;
+        await userService.verifyAccounts(email, code);
+        return res.status(200).json({ message: "user verified successfully", success: true });
+    } catch (error) {
+        const statusCode = error.statusCode || 500;
+        return res.status(statusCode).json({ success: false, message: error.message });
+    }
+};
+
+module.exports.resendCode = async (req, res) => {
+    try {
+        const { email } = req.body;
+        await userService.resendCode(email);
+        return res.status(200).json({ message: "code has been sent to your email", success: true });
+    } catch (error) {
+        const statusCode = error.statusCode || 500;
+        return res.status(statusCode).json({ success: false, message: error.message });
+    }
+};
+
+module.exports.foorgetPasswordVerifyCode = async (req, res) => {
+    try {
+        const { email, newPassword } = req.body;
+        await userService.forgetPasswordVerifyCode(email, newPassword);
+        return res.status(200).json({ message: "password has been changed successfully", success: true });
+    } catch (error) {
+        const statusCode = error.statusCode || 500;
+        return res.status(statusCode).json({ 
+            success: false, 
+            message: error.message,
+            ...(error.details && { errors: error.details }) 
+        });
+    }
+};
+
+module.exports.loginUser = async (req, res) => {
+    try {
+        const result = await userService.loginUser(req.body);
+        
+        res.cookie("jwt_login", result.token, {
+            httpOnly: true,
+            maxAge: result.maxTime,
+        });
+        
+        return res.status(200).json({
+            success: true,
+            user: result.user,
+            token: result.token,
+        });
+    } catch (error) {
+        const statusCode = error.statusCode || 500;
+        return res.status(statusCode).json({ 
+            success: false, 
+            message: error.message,
+            ...(error.details && { errors: error.details })
+        });
+    }
+};
 
 module.exports.getConnectedUser = async (req, res) => {
     try {
-       
         const id = req.session.user?._id;
-        
-        if (!id) {
-            return res.status(404).json({ message: "user not found" });
-        }
-        
-        const user = await userModel.findById(id).select('-password');
-        
-        if (!user) {
-            return res.status(404).json({ message: "user not found" });
-        }
-        
-        res.status(200).json({ user });
+        const user = await userService.getConnectedUser(id);
+        return res.status(200).json({ success: true, user });
     } catch (error) {
-        
-        res.status(500).json({ message: error.message });
+        const statusCode = error.statusCode || 500;
+        return res.status(statusCode).json({ success: false, message: error.message });
     }
-}
+};
 
-module.exports.logOutUser = async (res) => {
+module.exports.logOutUser = async (req, res) => {
     try {
         res.cookie("jwt_login", "", {
             maxAge: 1,
             httpOnly: true,
         });
-        res.status(200).json({ success: true, message: "Logged out successfully" });
+        return res.status(200).json({ success: true, message: "Logged out successfully" });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        return res.status(500).json({ success: false, message: error.message });
     }
-}
+};
 
 module.exports.changePassword = async (req, res) => {
     try {
-        const { currentPassord, newPassword, code } = req.body;
+        const { currentPassord, newPassword } = req.body;
         const id = req.session.user?._id || req.user?._id;
-
-        if (!id) {
-            return res.status(401).json({ message: 'Not authenticated' });
-        }
-
-        const change = await userModel.verifPasswordUser(id, currentPassord);
-
-        if (change) {
-            const { errors, isValid } = validatePassword(newPassword);
-            if (!isValid) {
-                return res.status(400).json({ errors, success: false });
-            }
-
-            const salt = await bcrypt.genSalt();
-            const hashedPassword = await bcrypt.hash(newPassword, salt);
-            await userModel.findByIdAndUpdate(id, {
-                password: hashedPassword
-            });
-
-            return res.status(200).json({
-                success: true,
-                message: "Password updated successfully"
-            });
-        }
-
-        return res.status(401).json({ message: 'Current password incorrect' });
+        
+        await userService.changePassword(id, currentPassord, newPassword);
+        return res.status(200).json({ success: true, message: "Password updated successfully" });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        const statusCode = error.statusCode || 500;
+        return res.status(statusCode).json({ 
+            success: false, 
+            message: error.message,
+            ...(error.details && { errors: error.details }) 
+        });
     }
-}
+};
 
-
-
-module.exports.updatePersonnelData = async function(req ,res){
-    try{
-        const { errors, isValid } = validateUserUpdate(req.body);
-
-        if (!isValid) {
-            return res.status(400).json({ errors, success: false });
-        }
-
-        const {username , email, phone , password}= req.body
-
-    
+module.exports.updatePersonnelData = async (req, res) => {
+    try {
+        const { password, ...data } = req.body;
         const id = req.session?.user?._id || req.user?._id;
-
-        if (!id) {
-            return res.status(401).json({ message: 'Not authenticated' });
-        }
-
-        const match = await userModel.verifPasswordUser(id, password);
-        if (match) {
-            
-            const updates = {};
-            if (username) updates.username = username;
-            if (email) updates.email = email;
-            if (phone) updates.phone = phone;
-
-            if (Object.keys(updates).length > 0) {
-                await userModel.findByIdAndUpdate(id, updates, { new: true });
-            }
-
-            return res.status(200).json({ message: 'success' });
-        }
-
-        return res.status(401).json({ message: 'Current password incorrect' });
-    }catch(error){
-        res.status(500).send({ message: error.message });
+        
+        await userService.updatePersonnelData(id, data, password);
+        return res.status(200).json({ success: true, message: 'success' });
+    } catch (error) {
+        const statusCode = error.statusCode || 500;
+        return res.status(statusCode).json({ 
+            success: false, 
+            message: error.message,
+            ...(error.details && { errors: error.details })
+        });
     }
-}
+};
 
-module.exports.updateUserStatus= async function (req , res){
-    try{
-
+module.exports.updateUserStatus = async (req, res) => {
+    try {
         const id = req.session?.user?._id || req.user?._id;
-        const user=await userModel.findById(id);
-        if(!user){
-            res.status(500).json({success: false,message:"user not found"})
-        }
-      await userModel.findByIdAndUpdate(
-    id,
-    { is_active: true },
-    { new: true } 
-);
-        res.status(200).json({success: true,message:"user updated"})
-    }catch(error){
-        console.log("error",error)
-        res.status(500).json({ message: error.message });
+        await userService.updateUserStatus(id);
+        return res.status(200).json({ success: true, message: "user updated" });
+    } catch (error) {
+        console.error("error", error);
+        const statusCode = error.statusCode || 500;
+        return res.status(statusCode).json({ success: false, message: error.message });
     }
+};
 
-}
-
-module.exports.getAllUsers =async function (res) {
-    try{
-        const users = await userModel.find().select("-password","-code");
-        res.status(200).json({success: true,users})
-    }catch(error){
-        res.status(500).json({success: false, message: error.message})
-    }  
-}
+module.exports.getAllUsers = async (req, res) => {
+    try {
+        const users = await userService.getAllUsers();
+        return res.status(200).json({ success: true, users });
+    } catch (error) {
+        return res.status(500).json({ success: false, message: error.message });
+    }
+};

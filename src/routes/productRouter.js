@@ -17,5 +17,6 @@ router.get('/getAllProduct',requireAuthUser, productController.getAllProduct);
 router.get('/getProductById/:id',requireAuthUser, productController.getProductById);
 router.get('/getProductByFiltres',requireAuthUser, productController.getProductByFiltres); 
 router.get('/getProductsBySupplier',requireAuthUser, productController.getSuppliersByProduct);
-router.get('/getProductsByCategories',requireAuthUser, productController.getProductsByCategories);  
-module.exports = router;
+router.get('/getProductsByCategories',requireAuthUser, productController.getProductsByCategories);
+router.get('/getSumProductByCategorie',requireAuthUser, productController.getSumProductByCategorie);
+module.exports = router;

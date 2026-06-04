@@ -4,6 +4,7 @@ const supplierModel = require("../models/suppliersModel");
 const productModel = require("../models/productModel");
 const productService = require("../services/productService");
 const { validateProductRegistration, validateProductUpdate ,validateProductSearch} = require('../validations/ProductValidations');
+const ProductModel = require("../repositories/userRepository");
 
 module.exports.addProduct = async (req, res) => {
  try{
@@ -156,25 +157,25 @@ module.exports.updateProduct = async function (req, res) {
       product: updatedProduct
     });
   } catch (error) {
-    console.error(error);
     return res.status(500).json({ message: error.message });
   }
 };
 
 module.exports.getProductById = async function (req, res) {
   try {
-    const id = req.params.id;
-   const product = await productModel
-  .findById(id)
-  .select('code name unit') 
-  .populate({ path: 'supplier', select: 'name' })
-  .populate({ path: 'categories', select: 'name' });
-    if (!product) {
-      return res.status(404).json({ success: false, message: "Produit non trouvé" });
-    }
+      const product = await productService.getProductById(req.params.id)
+
     return res.status(200).json({ success: true, product });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+
+    console.log(error);
+    const statusCode = error.statusCode || 500;
+    return res.status(statusCode).json({
+      success: false,
+      message: error.message,
+      ...(error.details && { details: error.details }),
+    });
+
   }
 };
 

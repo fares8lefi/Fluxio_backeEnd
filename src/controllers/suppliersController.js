@@ -1,135 +1,96 @@
-const supplierModel = require("../models/suppliersModel");
-const { validateSupplierRegistration, validateSupplierUpdate } = require('../validations/SuppliersValidations');
+// Contrôleur fournisseurs : gestion HTTP uniquement — tout accès direct au modèle supprimé, logique déléguée au supplierService.
+const supplierService = require('../services/supplierService');
 
+// POST /api/suppliers/addSuppliers
 module.exports.addSuppliers = async function (req, res) {
-  try {
-    const validationResult = validateSupplierRegistration(req.body);
-    if (!validationResult.isValid) {
-      return res.status(400).json({success: false, message: validationResult.errors});
+    try {
+        const supplier = await supplierService.addSupplier(req.body);
+        return res.status(201).json({ success: true, suppliers: supplier });
+    } catch (error) {
+        const statusCode = error.statusCode || 500;
+        return res.status(statusCode).json({
+            success: false,
+            message: error.message,
+            ...(error.details && { details: error.details }),
+        });
     }
-    const { name, code, email, phone, address } = req.body;
-    const suppliers = await supplierModel.create({
-      name,
-      code,
-      email,
-      phone,
-      address,
-    });
-    res.status(201).json({ success: true, suppliers });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
 };
 
+// PUT /api/suppliers/updateSuppliers/:id
 module.exports.updateSuppliers = async function (req, res) {
-  try {
-    const validationResult = validateSupplierUpdate(req.body);
-    if (!validationResult.isValid) {
-      return res.status(400).json({success: false, message: validationResult.errors});
+    try {
+        const supplier = await supplierService.updateSupplier(req.params.id, req.body);
+        return res.status(200).json({ success: true, supplier });
+    } catch (error) {
+        const statusCode = error.statusCode || 500;
+        return res.status(statusCode).json({
+            success: false,
+            message: error.message,
+            ...(error.details && { details: error.details }),
+        });
     }
-    const { name, code, email, phone, address } = req.body;
-    const id = req.params.id;
-    const verifId = await supplierModel.findById(id);
-    if (!verifId) {
-      return res.status(404).json({ success: false, message: "suppliers not found" });
-    }
-    const updates = {};
-    if (name !== undefined) updates.name = name;
-    if (code !== undefined) updates.code = code;
-    if (email !== undefined) updates.email = email;
-    if (phone !== undefined) updates.phone = phone;
-    if (address !== undefined) updates.address = address;
-
-    const suppliers = await supplierModel.findByIdAndUpdate(id, updates, { new: true });
-    res.status(200).json({ success: true, supplier: suppliers });
-  } catch (error) {
-    console.log("error==>", error);
-    res.status(500).json({ message: error.message });
-  }
 };
 
+// DELETE /api/suppliers/deleteSuppliers/:id
 module.exports.deleteSuppliers = async function (req, res) {
-  try {
-    const id = req.params.id;
-
-    const verifId = await supplierModel.findById(id);
-
-    if (!verifId) {
-      return res.status(404).json({ success: false, message: "suppliers not found" });
+    try {
+        await supplierService.deleteSupplier(req.params.id);
+        return res.status(200).json({ success: true, message: 'Fournisseur supprimé avec succès' });
+    } catch (error) {
+        const statusCode = error.statusCode || 500;
+        return res.status(statusCode).json({ success: false, message: error.message });
     }
-    await supplierModel.findByIdAndDelete(id);
-    res
-      .status(200)
-      .json({ success: true, message: "suppliers delete successfully" });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
 };
 
-
-module.exports.getActiveSuppliers = async function(_req, res) {
-  try {
-    const suppliers = await supplierModel.find({ is_active: true }).select("name code email phone address");
-    if (suppliers.length === 0) {
-      return res.status(404).json({ success: false, message: "no active suppliers found" });
+// GET /api/suppliers/getActiveSuppliers
+module.exports.getActiveSuppliers = async function (_req, res) {
+    try {
+        const suppliers = await supplierService.getActiveSuppliers();
+        if (suppliers.length === 0) {
+            return res.status(404).json({ success: false, message: 'Aucun fournisseur actif trouvé' });
+        }
+        return res.status(200).json({ success: true, suppliers });
+    } catch (error) {
+        const statusCode = error.statusCode || 500;
+        return res.status(statusCode).json({ success: false, message: error.message });
     }
-    res.status(200).json({ success: true, suppliers });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-}
+};
 
-module.exports.updateSuppliersStatus = async function(req, res) {
-  try {
-    const id = req.params.id;
-    const suppliers = await supplierModel.findById(id);
-    if (!suppliers) {
-      return res.status(404).json({ success: false, message: "suppliers not found" });
+// PATCH /api/suppliers/updateSuppliersStatus/:id
+module.exports.updateSuppliersStatus = async function (req, res) {
+    try {
+        await supplierService.deactivateSupplier(req.params.id);
+        return res.status(200).json({ success: true, message: 'Fournisseur désactivé avec succès' });
+    } catch (error) {
+        const statusCode = error.statusCode || 500;
+        return res.status(statusCode).json({ success: false, message: error.message });
     }
-    await supplierModel.findByIdAndUpdate(id, {
-      is_active: false
-    });
-    res.status(200).json({ success: true, message: "suppliers are inactive" });
-  } catch (error) {
-    res.status(500).json({ message: error.message });  }
-}
+};
 
-
-
-module.exports.searchSuppliersByName = async function(req, res) {
-  try {
-      const { name } = req.query; 
-
-      if (!name) {
-        return res.status(400).json({ success: false, message: "Name parameter is required" });
-      }
-
-    
-      const suppliers = await supplierModel.find({ 
-        name: { $regex: name, $options: "i" } 
-      }); 
-
-      if (!suppliers || suppliers.length === 0) {
-        return res.status(404).json({ success: false, message: "No suppliers matching that name found" });
-      }
-
-      res.status(200).json({ success: true, count: suppliers.length, suppliers });
-
-  } catch (error) {
-      console.log("error ===>", error);
-      res.status(500).json({ success: false, message: error.message });
-  }
-}
-
-module.exports.getAllSuppliers = async function(_req, res) {
-  try {
-    const suppliers = await supplierModel.find();
-    if (suppliers.length === 0) {
-      return res.status(404).json({ success: false, message: "no suppliers found" });
+// GET /api/suppliers/searchSuppliersByName?name=...
+module.exports.searchSuppliersByName = async function (req, res) {
+    try {
+        const suppliers = await supplierService.searchSuppliersByName(req.query.name);
+        if (suppliers.length === 0) {
+            return res.status(404).json({ success: false, message: 'Aucun fournisseur trouvé avec ce nom' });
+        }
+        return res.status(200).json({ success: true, count: suppliers.length, suppliers });
+    } catch (error) {
+        const statusCode = error.statusCode || 500;
+        return res.status(statusCode).json({ success: false, message: error.message });
     }
-    res.status(200).json({ success: true, suppliers });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-}
+};
 
+// GET /api/suppliers/getAllSuppliers
+module.exports.getAllSuppliers = async function (_req, res) {
+    try {
+        const suppliers = await supplierService.getAllSuppliers();
+        if (suppliers.length === 0) {
+            return res.status(404).json({ success: false, message: 'Aucun fournisseur trouvé' });
+        }
+        return res.status(200).json({ success: true, suppliers });
+    } catch (error) {
+        const statusCode = error.statusCode || 500;
+        return res.status(statusCode).json({ success: false, message: error.message });
+    }
+};

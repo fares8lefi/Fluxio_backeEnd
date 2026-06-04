@@ -46,8 +46,21 @@ const deleteProduct= async(data )=> {
 const getAllProducts = async()=>{
     return await productRepoitory.getAllProduct();
 }
+// get product by id
+const getProductById = async (data)=>{
+    const product=  await productRepoitory.getProductById(data);
+    if(!product){
+        const error = new Error('product not found ');
+        error.statusCode = 400;
+        throw error;
+    }
+    return product;
+}
+
+
 module.exports = {
     addProduct,
     deleteProduct,
     getAllProducts,
+    getProductById,
 }

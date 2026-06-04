@@ -90,18 +90,22 @@ const productSearchSchema = z.object({
         .min(1, 'Le nom ne peut pas être vide')
         .optional(),
 
+    // z.coerce.number() is required because req.query values are always strings
     unit: z
+        .coerce
         .number({ invalid_type_error: "L'unité doit être un nombre entier" })
         .int("L'unité doit être un nombre entier")
         .min(0, "L'unité doit être un nombre entier positif")
         .optional(),
 
     maxPrice: z
+        .coerce
         .number({ invalid_type_error: 'Le prix maximum doit être un nombre positif' })
         .min(0, 'Le prix maximum doit être un nombre positif')
         .optional(),
 
     minPrice: z
+        .coerce
         .number({ invalid_type_error: 'Le prix minimum doit être un nombre positif' })
         .min(0, 'Le prix minimum doit être un nombre positif')
         .optional(),
@@ -116,7 +120,7 @@ const productSearchSchema = z.object({
  */
 const formatResult = (result) => {
     if (result.success) {
-        return { errors: {}, isValid: true };
+        return { errors: {}, isValid: true, data: result.data }; // expose parsed/coerced data
     }
     const errors = {};
     result.error.issues.forEach(({ path, message }) => {
@@ -125,7 +129,7 @@ const formatResult = (result) => {
             errors[key] = message;
         }
     });
-    return { errors, isValid: false };
+    return { errors, isValid: false, data: null };
 };
 
 // ─── Exported validators ─────────────────────────────────────────────────────

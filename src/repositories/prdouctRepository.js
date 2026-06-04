@@ -1,17 +1,19 @@
-const categoryModel = require('../models/categorieModel');
+const  productModel= require('../models/productModel');
 
 const addProduct = async (data) => {
-    return await categoryModel.create(data) ;
+    return await productModel.create(data) ;
 }
 
 const updateProduct = async (data ,id) => {
-    return await categoryModel.findByIdAndUpdate(id,data ,{new: true}) ;
+    return await productModel.findByIdAndUpdate(id,data ,{new: true}) ;
 }
 const getAllProduct = async () => {
-    return await categoryModel.find() ;
+    return await productModel.find() ;
 }
 const getProductById = async (id) => {
-    return await categoryModel.findById(id) ;
+    return await productModel.findById(id).select('code name unit')
+        .populate({ path: 'supplier', select: 'name' })
+        .populate({ path: 'categories', select: 'name' });
 }
 const deleteProduct = async (id) => {
     return await categoryModel.findByIdAndDelete(id) ;

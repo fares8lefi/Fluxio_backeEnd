@@ -1,312 +1,143 @@
-const mongoose = require('mongoose');
-const categorieModel = require("../models/categorieModel");
-const supplierModel = require("../models/suppliersModel");
-const productModel = require("../models/productModel");
-const productService = require("../services/productService");
-const { validateProductRegistration, validateProductUpdate ,validateProductSearch} = require('../validations/ProductValidations');
-const ProductModel = require("../repositories/userRepository");
+// Contrôleur produits : gestion HTTP uniquement — chaque handler délègue entièrement au service sans accès direct aux modèles.
+const productService = require('../services/productService');
+const { validateProductUpdate } = require('../validations/ProductValidations');
 
+// POST /api/products/addProduct
 module.exports.addProduct = async (req, res) => {
- try{
-    const  user = req.session?.user;
-    const product =  await productService.addProduct(req.body, user)
-   res.status(201).json({ message: 'Product created successfully.' ,success :true , product})
-}catch (error){
-   console.log(error);
-   const statusCode = error.statusCode || 500;
-   return res.status(statusCode).json({
-     success: false,
-     message: error.message,
-     ...(error.details && { details: error.details }),
-   });
- }
+    try {
+        const user = req.session?.user;
+        const product = await productService.addProduct(req.body, user);
+        return res.status(201).json({ success: true, message: 'Produit créé avec succès', product });
+    } catch (error) {
+        const statusCode = error.statusCode || 500;
+        return res.status(statusCode).json({
+            success: false,
+            message: error.message,
+            ...(error.details && { details: error.details }),
+        });
+    }
+};
 
-}
-
-
+// DELETE /api/products/deleteProduct/:id
 module.exports.deleteProduct = async function (req, res) {
-  try {
-    const deleteResult = await productService.deleteProduct(req.params.id);
-
-    return res.status(200).json({ success: true, message: "Produit supprimé avec succès" });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+    try {
+        await productService.deleteProduct(req.params.id);
+        return res.status(200).json({ success: true, message: 'Produit supprimé avec succès' });
+    } catch (error) {
+        const statusCode = error.statusCode || 500;
+        return res.status(statusCode).json({ success: false, message: error.message });
+    }
 };
 
-module.exports.product = async (req, res) => {
-  try {
-    const product = await productService.getAllProducts()
-    res.status(200).json(product);
-  }catch(error){
-    console.log(error);
-    const statusCode = error.statusCode || 500;
-    return res.status(statusCode).json({
-      success: false,
-      message: error.message,})
-  }
-}
-
+// GET /api/products/getAllProduct  (avec pagination)
 module.exports.getAllProduct = async function (req, res) {
-  try {
-    // paramètres de pagination
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
 
-    // requête avec pagination
-    const products = await productModel
-      .find()
-      .populate('supplier')
-      .populate('categories')
-      .skip(skip)
-      .limit(limit);
+        const { products, total } = await productService.getAllProductsPaginated(page, limit);
 
-    // total des produits 
-    const total = await productModel.countDocuments();
+        if (products.length === 0) {
+            return res.status(404).json({ success: false, message: 'Aucun produit trouvé' });
+        }
 
-    if (products.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: "aucun produit trouvé",
-      });
+        return res.status(200).json({
+            success: true,
+            products,
+            pagination: {
+                total,
+                page,
+                pages: Math.ceil(total / limit),
+            },
+        });
+    } catch (error) {
+        const statusCode = error.statusCode || 500;
+        return res.status(statusCode).json({ success: false, message: error.message });
     }
-
-    return res.status(200).json({
-      success: true,
-      products,
-      pagination: {
-        total,
-        page,
-        pages: Math.ceil(total / limit),
-      },
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
 };
 
+// PUT /api/products/updateProduct/:id
 module.exports.updateProduct = async function (req, res) {
-  try {
-    const validationResult = validateProductUpdate(req.body);
-    if (!validationResult.isValid) {
-      return res.status(400).json({success: false, message: validationResult.errors});
-    }
-    const id = req.params.id;
-    const {
-      code,
-      barcode,
-      name,
-      purchase_price,
-      selling_price,
-      unit,
-      stock_min,
-      supplier,
-      categories,
-    } = req.body;
-
-    // Vérifier si le produit existe
-    const product = await productModel.findById(id);
-    if (!product) {
-      return res.status(404).json({ success: false, message: "Produit non trouvé" });
-    }
-
-    // Vérifier si le fournisseur existe (si fourni)
-    if (supplier) {
-      if (!mongoose.Types.ObjectId.isValid(supplier)) {
-        return res.status(400).json({ success: false, message: "Format d'ID fournisseur invalide" });
-      }
-      const supplierExists = await supplierModel.findById(supplier);
-      if (!supplierExists) {
-        return res.status(400).json({ success: false, message: "Fournisseur introuvable" });
-      }
-    }
-
-    // Vérifier si les catégories existent (si fournies)
-    if (categories && Array.isArray(categories)) {
-      for (const catId of categories) {
-        if (!mongoose.Types.ObjectId.isValid(catId)) {
-          return res.status(400).json({ success: false, message: `Format d'ID catégorie invalide : ${catId}` });
+    try {
+        const validationResult = validateProductUpdate(req.body);
+        if (!validationResult.isValid) {
+            return res.status(400).json({ success: false, message: validationResult.errors });
         }
-        const catExists = await categorieModel.findById(catId);
-        if (!catExists) {
-          return res.status(400).json({ success: false, message: `Catégorie introuvable : ${catId}` });
-        }
-      }
+
+        const updatedProduct = await productService.updateProduct(req.params.id, req.body);
+        return res.status(200).json({
+            success: true,
+            message: 'Produit mis à jour avec succès',
+            product: updatedProduct,
+        });
+    } catch (error) {
+        const statusCode = error.statusCode || 500;
+        return res.status(statusCode).json({ success: false, message: error.message });
     }
-
-    // Construire l'objet de mise à jour avec seulement les champs fournis
-    const updates = {};
-    if (code !== undefined) updates.code = code;
-    if (barcode !== undefined) updates.barcode = barcode;
-    if (name !== undefined) updates.name = name;
-    if (purchase_price !== undefined) updates.purchase_price = purchase_price;
-    if (selling_price !== undefined) updates.selling_price = selling_price;
-    if (unit !== undefined) updates.unit = unit;
-    if (stock_min !== undefined) updates.stock_min = stock_min;
-    if (supplier !== undefined) updates.supplier = supplier;
-    if (categories !== undefined) updates.categories = categories;
-
-    const updatedProduct = await productModel.findByIdAndUpdate(id, updates, { new: true })
-      .populate('supplier')
-      .populate('categories');
-
-    return res.status(200).json({
-      success: true,
-      message: "Produit mis à jour avec succès",
-      product: updatedProduct
-    });
-  } catch (error) {
-    return res.status(500).json({ message: error.message });
-  }
 };
 
+// GET /api/products/getProductById/:id
 module.exports.getProductById = async function (req, res) {
-  try {
-      const product = await productService.getProductById(req.params.id)
-
-    return res.status(200).json({ success: true, product });
-  } catch (error) {
-
-    console.log(error);
-    const statusCode = error.statusCode || 500;
-    return res.status(statusCode).json({
-      success: false,
-      message: error.message,
-      ...(error.details && { details: error.details }),
-    });
-
-  }
+    try {
+        const product = await productService.getProductById(req.params.id);
+        return res.status(200).json({ success: true, product });
+    } catch (error) {
+        const statusCode = error.statusCode || 500;
+        return res.status(statusCode).json({
+            success: false,
+            message: error.message,
+            ...(error.details && { details: error.details }),
+        });
+    }
 };
 
+// GET /api/products/getProductByFiltres?name=...&unit=...&minPrice=...&maxPrice=...
 module.exports.getProductByFiltres = async function (req, res) {
-  try {
-    const products = await productService.getProductByFiltres(req.query);
-    if (products.length === 0) {
-      return res.status(404).json({ success: false, message: "aucun produit trouvé" });
+    try {
+        const products = await productService.getProductByFiltres(req.query);
+        if (products.length === 0) {
+            return res.status(404).json({ success: false, message: 'Aucun produit trouvé' });
+        }
+        return res.status(200).json({ success: true, products });
+    } catch (error) {
+        const statusCode = error.statusCode || 500;
+        return res.status(statusCode).json({
+            success: false,
+            message: error.message,
+            ...(error.details && { details: error.details }),
+        });
     }
-    return res.status(200).json({ success: true, products });
-  } catch (error) {
-    console.log(error);
-    const statusCode = error.statusCode || 500;
-    return res.status(statusCode).json({
-      success: false,
-      message: error.message,
-      ...(error.details && { details: error.details }),
-    });
-  }
-}
-  
+};
 
+// GET /api/products/getSumProductByCategorie
 module.exports.getSumProductByCategorie = async function (_req, res) {
-  try {
-    const products = await productModel.aggregate([
-      { $unwind: "$categories" },
-      {
-        $lookup: {
-          from: "categories",
-          localField: "categories",
-          foreignField: "_id",
-          as: "categoryInfo"
-        }
-      },
-      { $unwind: "$categoryInfo" },
-      {
-        $group: {
-          _id: "$categoryInfo.name",
-          count: { $sum: 1 }
-        }
-      },
-      {
-        $project: {
-          _id: 0,
-          category: "$_id",
-          count: 1
-        }
-      }
-    ]);
-    return res.status(200).json({ success: true, products });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-} 
+    try {
+        const products = await productService.getSumProductByCategorie();
+        return res.status(200).json({ success: true, products });
+    } catch (error) {
+        return res.status(500).json({ success: false, message: error.message });
+    }
+};
 
-
+// GET /api/products/getProductsByCategories
 module.exports.getProductsByCategories = async function (_req, res) {
-  try {
-    const products = await productModel.aggregate([
-      { $unwind: "$categories" },
-      {
-        $lookup: {
-          from: "categories",
-          localField: "categories",
-          foreignField: "_id",
-          as: "categoryInfo"
+    try {
+        const products = await productService.getProductsByCategories();
+        if (products.length === 0) {
+            return res.status(404).json({ success: false, message: 'Aucun produit trouvé' });
         }
-      },
-      { $unwind: "$categoryInfo" },
-      {
-        $lookup: {
-          from: "suppliers",
-          localField: "supplier",
-          foreignField: "_id",
-          as: "supplierInfo"
-        }
-      },
-      { $unwind: { path: "$supplierInfo", preserveNullAndEmptyArrays: true } },
-      {
-        $group: {
-          _id: "$categoryInfo._id",
-          categoryName: { $first: "$categoryInfo.name" },
-          products: {
-            $push: {
-              _id: "$_id",
-              name: "$name",
-              price: "$selling_price",
-              quantity: "$unit",
-              supplier: "$supplierInfo.name"
-            }
-          },
-          count: { $sum: 1 }
-        }
-      },
-      {
-        $project: {
-          _id: 0,
-          category: "$categoryName",
-          count: 1,
-          products: 1
-        }
-      }
-    ]);
-    return res.status(200).json({ success: true, products });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-}
+        return res.status(200).json({ success: true, products });
+    } catch (error) {
+        return res.status(500).json({ success: false, message: error.message });
+    }
+};
 
+// GET /api/products/getSuppliersByProduct
 module.exports.getSuppliersByProduct = async function (_req, res) {
-  try {
-    const products = await productModel.aggregate([
-      {
-        $lookup: {
-          from: "suppliers",
-          localField: "supplier",
-          foreignField: "_id",
-          as: "supplierInfo"
-        }
-      },
-      { $unwind: { path: "$supplierInfo", preserveNullAndEmptyArrays: true } },
-      {
-        $project: {
-          _id: 0,
-          productName: "$name",
-          supplier: "$supplierInfo.name"
-        }
-      }
-    ]);
-    return res.status(200).json({ success: true, products });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-}
+    try {
+        const products = await productService.getSuppliersByProduct();
+        return res.status(200).json({ success: true, products });
+    } catch (error) {
+        return res.status(500).json({ success: false, message: error.message });
+    }
+};

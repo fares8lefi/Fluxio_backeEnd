@@ -1,6 +1,6 @@
 const { z } = require('zod');
 
-// ─── Schemas ────────────────────────────────────────────────────────────────
+
 
 const userRegistrationSchema = z.object({
     username: z

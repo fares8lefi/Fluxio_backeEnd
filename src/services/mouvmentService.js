@@ -1,18 +1,20 @@
+// Logique métier des mouvements de stock : l'import direct de productModel remplacé par productRepository, conformément à l'architecture en couches.
 const mouvmentRepository = require('../repositories/mouvmentRepository');
-const productModel = require('../models/productModel'); // Utilisé directement en attendant le refactoring de Product
+const productRepository = require('../repositories/prdouctRepository');
 const { validateMouvmentRegistration } = require('../validations/mouvmentValidations');
 
-// Fonctions privées pour gérer le stock
+// Augmente le stock d'un produit
 const increaseStock = async (productId, quantity) => {
-    const product = await productModel.findById(productId);
-    if (!product) throw new Error('Product not found');
+    const product = await productRepository.getProductById(productId);
+    if (!product) throw new Error('Produit introuvable');
     product.unit += quantity;
     await product.save();
 };
 
+// Diminue le stock d'un produit
 const decreaseStock = async (productId, quantity) => {
-    const product = await productModel.findById(productId);
-    if (!product) throw new Error('Product not found');
+    const product = await productRepository.getProductById(productId);
+    if (!product) throw new Error('Produit introuvable');
     product.unit -= quantity;
     await product.save();
 };
@@ -24,14 +26,14 @@ const createMouvment = async (data, user) => {
         error.statusCode = 401;
         throw error;
     }
-    
+
     data.created_by = user._id;
-    
+
     // Définir le prix unitaire si non fourni
     if (data.items && Array.isArray(data.items)) {
         for (let item of data.items) {
             if (item.unit_price === undefined || item.unit_price === null) {
-                const product = await productModel.findById(item.product);
+                const product = await productRepository.getProductById(item.product);
                 if (product) {
                     item.unit_price = ['OUT', 'RETURN_CLIENT'].includes(data.type)
                         ? product.selling_price
@@ -40,7 +42,7 @@ const createMouvment = async (data, user) => {
             }
         }
     }
-    
+
     const validationResult = validateMouvmentRegistration(data);
     if (!validationResult.isValid) {
         const error = new Error('Validation échouée');
@@ -48,13 +50,13 @@ const createMouvment = async (data, user) => {
         error.details = validationResult.errors;
         throw error;
     }
-    
+
     const { type, items, supplier, reference, note, status, created_by } = data;
-    
+
     // Vérifier le stock pour les sorties
     if (['OUT', 'RETURN_SUPPLIER'].includes(type)) {
         for (const item of items) {
-            const product = await productModel.findById(item.product);
+            const product = await productRepository.getProductById(item.product);
             if (!product) {
                 const error = new Error(`Produit introuvable : ${item.product}`);
                 error.statusCode = 404;
@@ -67,7 +69,7 @@ const createMouvment = async (data, user) => {
             }
         }
     }
-    
+
     // Mise à jour des stocks
     for (const item of items) {
         if (['IN', 'RETURN_CLIENT'].includes(type)) {
@@ -76,7 +78,7 @@ const createMouvment = async (data, user) => {
             await decreaseStock(item.product, item.unit);
         }
     }
-    
+
     return await mouvmentRepository.create({
         type,
         items,
@@ -84,7 +86,7 @@ const createMouvment = async (data, user) => {
         reference: reference || null,
         note: note || null,
         status: status || 'CONFIRMED',
-        created_by
+        created_by,
     });
 };
 
@@ -92,14 +94,14 @@ const createMouvment = async (data, user) => {
 const getAllMouvments = async (page) => {
     const limit = parseInt(process.env.limitByPage) || 10;
     const numbrePage = parseInt(page) || 1;
-    
+
     const mouvments = await mouvmentRepository.findPaginated(numbrePage, limit);
     const count = await mouvmentRepository.countAll();
-    
+
     return { mouvments, count };
 };
 
 module.exports = {
     createMouvment,
-    getAllMouvments
+    getAllMouvments,
 };

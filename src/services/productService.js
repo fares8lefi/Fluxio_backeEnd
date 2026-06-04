@@ -4,6 +4,7 @@ const supplierModel = require('../models/suppliersModel');
 const categoryModel = require('../models/categorieModel');
 
 const productValidations = require('../validations/ProductValidations');
+const {validateProductSearch} = require("../validations/ProductValidations");
 
 
 const addProduct= async(data , user)=> {
@@ -57,10 +58,35 @@ const getProductById = async (data)=>{
     return product;
 }
 
+const getProductByFiltres= async (data)=>{
+    const validationResult = validateProductSearch(data);
+    if (!validationResult.isValid) {
+        const error = new Error('params not valid ');
+        error.statusCode = 400;
+        throw error;
+    }
+    const {name, unit, maxPrice, minPrice} = validationResult.data; // extract parsed & coerced data
+    const filter = {};
+    // Build dynamic filter object based on provided query parameters
+    if (name) filter.name = { $regex: name, $options: 'i' }; // filter by name (case-insensitive)
+    if (unit !== undefined) filter.unit = unit;               // filter by unit
+    if (maxPrice !== undefined && minPrice !== undefined) {
+        filter.selling_price = { $gte: minPrice, $lte: maxPrice }; // combined range
+    } else if (maxPrice !== undefined) {
+        filter.selling_price = { $lte: maxPrice };            // filter by max price
+    } else if (minPrice !== undefined) {
+        filter.selling_price = { $gte: minPrice };            // filter by min price
+    }
+    const products = await productRepoitory.getProductByFiltres(filter); // get data
+    return products; // empty array handled by the controller
+}
+const getProductsBySupplier =async(data)=>{
 
+}
 module.exports = {
     addProduct,
     deleteProduct,
     getAllProducts,
     getProductById,
+    getProductByFiltres,
 }

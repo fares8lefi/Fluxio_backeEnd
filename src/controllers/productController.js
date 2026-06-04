@@ -180,26 +180,21 @@ module.exports.getProductById = async function (req, res) {
 };
 
 module.exports.getProductByFiltres = async function (req, res) {
-try{
-  const validationResult = validateProductSearch(req.query);
-    if (!validationResult.isValid) {
-      return res.status(400).json({success: false, message: validationResult.errors});
+  try {
+    const products = await productService.getProductByFiltres(req.query);
+    if (products.length === 0) {
+      return res.status(404).json({ success: false, message: "aucun produit trouvé" });
     }
-const {name,unit,Maxprice,MinPrice}=req.query;
- const filter = {};
- if (name) filter.name = name;
- if (unit) filter.unit = unit;
- if (Maxprice) filter.selling_price = { $lte: Maxprice };
- if (MinPrice) filter.selling_price = { $gte: MinPrice };
- const products = await productModel.find(filter).populate('supplier').populate('categories');
- if (products.length === 0) {
-   return res.status(404).json({ success: false, message: "aucun produit trouvé" });
- }
- return res.status(200).json({ success: true, products });
-
-}catch(error){
-  res.status(500).json({ message: error.message });
-}
+    return res.status(200).json({ success: true, products });
+  } catch (error) {
+    console.log(error);
+    const statusCode = error.statusCode || 500;
+    return res.status(statusCode).json({
+      success: false,
+      message: error.message,
+      ...(error.details && { details: error.details }),
+    });
+  }
 }
   
 

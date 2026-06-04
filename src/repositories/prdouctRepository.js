@@ -18,11 +18,14 @@ const getProductById = async (id) => {
 const deleteProduct = async (id) => {
     return await categoryModel.findByIdAndDelete(id) ;
 }
-
+const getProductByFiltres = async(data)=>{
+    return await productModel.find(data).populate('supplier').populate('categories');
+}
 module.exports = {
     addProduct,
     updateProduct,
     getAllProduct,
     getProductById,
-    deleteProduct
+    deleteProduct,
+    getProductByFiltres,
 }

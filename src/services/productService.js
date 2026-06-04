@@ -1,14 +1,12 @@
-const productRepoitory = require('../repositories/prdouctRepository');
-const productModel = require('../models/productModel');
+// Logique métier des produits : validation, vérifications métier et orchestration du repository — aucun accès direct au modèle Mongoose.
+const productRepository = require('../repositories/prdouctRepository');
 const supplierModel = require('../models/suppliersModel');
 const categoryModel = require('../models/categorieModel');
-
+const { validateProductSearch } = require('../validations/ProductValidations');
 const productValidations = require('../validations/ProductValidations');
-const {validateProductSearch} = require("../validations/ProductValidations");
 
-
-const addProduct= async(data , user)=> {
-
+// Ajoute un produit
+const addProduct = async (data, user) => {
     const validationResult = await productValidations.validateProductRegistration(data);
     if (!validationResult.isValid) {
         const error = new Error('Validation échouée');
@@ -17,76 +15,131 @@ const addProduct= async(data , user)=> {
         throw error;
     }
 
-    const {code, barcode, name, purchase_price, selling_price, unit, stock_min, upplier, categories} = data
-    const suppliers = await supplierModel.findById(upplier);
-    if (!suppliers) {
-        const error = new Error('supplier not found ');
+    const { code, barcode, name, purchase_price, selling_price, unit, stock_min, upplier, categories } = data;
+
+    const supplier = await supplierModel.findById(upplier);
+    if (!supplier) {
+        const error = new Error('Fournisseur introuvable');
         error.statusCode = 404;
         throw error;
     }
+
     const cat = await categoryModel.findById(categories);
-    if(!cat){
-        const error = new Error('category not found ');
+    if (!cat) {
+        const error = new Error('Catégorie introuvable');
         error.statusCode = 404;
         throw error;
     }
-    return await productRepoitory.addProduct({code, barcode, name, purchase_price, selling_price, unit, stock_min, upplier, categories});
-}
 
+    return await productRepository.addProduct({ code, barcode, name, purchase_price, selling_price, unit, stock_min, upplier, categories });
+};
 
-const deleteProduct= async(data )=> {
-    const verifProduct = await productModel.findById(data);
-    if(!data){
-        const error = new Error('product not found ');
-        error.statusCode = 400;
+// Supprime un produit
+const deleteProduct = async (id) => {
+    const product = await productRepository.getProductById(id);
+    if (!product) {
+        const error = new Error('Produit introuvable');
+        error.statusCode = 404;
         throw error;
     }
-    return await productRepoitory.deleteProduct(data);
-}
+    return await productRepository.deleteProduct(id);
+};
 
-const getAllProducts = async()=>{
-    return await productRepoitory.getAllProduct();
-}
-// get product by id
-const getProductById = async (data)=>{
-    const product=  await productRepoitory.getProductById(data);
-    if(!product){
-        const error = new Error('product not found ');
-        error.statusCode = 400;
+// Récupère tous les produits (liste simple)
+const getAllProducts = async () => {
+    return await productRepository.getAllProduct();
+};
+
+// Récupère les produits avec pagination
+const getAllProductsPaginated = async (page, limit) => {
+    const products = await productRepository.findPaginated(page, limit);
+    const total = await productRepository.countAll();
+    return { products, total };
+};
+
+// Récupère un produit par ID
+const getProductById = async (id) => {
+    const product = await productRepository.getProductById(id);
+    if (!product) {
+        const error = new Error('Produit introuvable');
+        error.statusCode = 404;
         throw error;
     }
     return product;
-}
+};
 
-const getProductByFiltres= async (data)=>{
+// Met à jour un produit
+const updateProduct = async (id, data) => {
+    const existing = await productRepository.getProductById(id);
+    if (!existing) {
+        const error = new Error('Produit introuvable');
+        error.statusCode = 404;
+        throw error;
+    }
+
+    const { code, barcode, name, purchase_price, selling_price, unit, stock_min, supplier, categories } = data;
+    const updates = {};
+    if (code !== undefined) updates.code = code;
+    if (barcode !== undefined) updates.barcode = barcode;
+    if (name !== undefined) updates.name = name;
+    if (purchase_price !== undefined) updates.purchase_price = purchase_price;
+    if (selling_price !== undefined) updates.selling_price = selling_price;
+    if (unit !== undefined) updates.unit = unit;
+    if (stock_min !== undefined) updates.stock_min = stock_min;
+    if (supplier !== undefined) updates.supplier = supplier;
+    if (categories !== undefined) updates.categories = categories;
+
+    return await productRepository.updateProduct(updates, id);
+};
+
+// Recherche par filtres dynamiques
+const getProductByFiltres = async (data) => {
     const validationResult = validateProductSearch(data);
     if (!validationResult.isValid) {
-        const error = new Error('params not valid ');
+        const error = new Error('Paramètres invalides');
         error.statusCode = 400;
         throw error;
     }
-    const {name, unit, maxPrice, minPrice} = validationResult.data; // extract parsed & coerced data
-    const filter = {};
-    // Build dynamic filter object based on provided query parameters
-    if (name) filter.name = { $regex: name, $options: 'i' }; // filter by name (case-insensitive)
-    if (unit !== undefined) filter.unit = unit;               // filter by unit
-    if (maxPrice !== undefined && minPrice !== undefined) {
-        filter.selling_price = { $gte: minPrice, $lte: maxPrice }; // combined range
-    } else if (maxPrice !== undefined) {
-        filter.selling_price = { $lte: maxPrice };            // filter by max price
-    } else if (minPrice !== undefined) {
-        filter.selling_price = { $gte: minPrice };            // filter by min price
-    }
-    const products = await productRepoitory.getProductByFiltres(filter); // get data
-    return products; // empty array handled by the controller
-}
-const getProductsBySupplier =async(data)=>{
 
-}
+    const { name, unit, maxPrice, minPrice } = validationResult.data;
+    const filter = {};
+    if (name) filter.name = { $regex: name, $options: 'i' };
+    if (unit !== undefined) filter.unit = unit;
+    if (maxPrice !== undefined && minPrice !== undefined) {
+        filter.selling_price = { $gte: minPrice, $lte: maxPrice };
+    } else if (maxPrice !== undefined) {
+        filter.selling_price = { $lte: maxPrice };
+    } else if (minPrice !== undefined) {
+        filter.selling_price = { $gte: minPrice };
+    }
+
+    return await productRepository.getProductByFiltres(filter);
+};
+
+// Produits groupés par catégorie
+const getProductsByCategories = async () => {
+    return await productRepository.getProductsByCategories();
+};
+
+// Nombre de produits par catégorie
+const getSumProductByCategorie = async () => {
+    return await productRepository.getSumProductByCategorie();
+};
+
+// Produits avec leur fournisseur
+const getSuppliersByProduct = async () => {
+    return await productRepository.getSuppliersByProduct();
+};
+
 module.exports = {
     addProduct,
     deleteProduct,
     getAllProducts,
+    getAllProductsPaginated,
     getProductById,
+    updateProduct,
     getProductByFiltres,
-}
+    getProductsByCategories,
+    getSumProductByCategorie,
+    getSuppliersByProduct,
+};

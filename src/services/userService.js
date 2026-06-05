@@ -1,6 +1,5 @@
-// Logique métier des utilisateurs : les appels findOne() directs sont remplacés par le repository ; userModel est conservé uniquement pour ses méthodes statiques bcrypt (login, verifPasswordUser).
+// Logique métier des utilisateurs — toutes les opérations Mongoose remplacées par le repository Prisma.
 const userRepository = require('../repositories/userRepository');
-const userModel = require('../models/userModel');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { sendEmailVerificationCode, sendEmailResetCode } = require('./SendEmail');
@@ -31,7 +30,8 @@ const createUser = async (data) => {
 };
 
 const verifyAccounts = async (email, code) => {
-    const user = await userRepository.findOneByEmail(email);
+    // findOneByEmail returns user without password — we need the full user with code
+    const user = await userRepository.findOneByEmailWithPassword(email);
     if (!user) {
         const error = new Error('Utilisateur introuvable');
         error.statusCode = 404;
@@ -44,14 +44,11 @@ const verifyAccounts = async (email, code) => {
         throw error;
     }
 
-    user.is_active = true;
-    user.code = null;
-    await user.save();
+    await userRepository.update(user.id, { is_active: true, code: null });
 };
 
 const resendCode = async (email) => {
-    // Need full doc with code field — use model directly (select includes code)
-    const user = await userModel.findOne({ email });
+    const user = await userRepository.findOneByEmailWithPassword(email);
     if (!user) {
         const error = new Error('Utilisateur introuvable');
         error.statusCode = 404;
@@ -59,8 +56,7 @@ const resendCode = async (email) => {
     }
 
     const code = Math.floor(1000 + Math.random() * 9000);
-    user.code = code;
-    await user.save();
+    await userRepository.update(user.id, { code });
 
     await sendEmailVerificationCode(email, user.username, code);
 };
@@ -74,8 +70,7 @@ const forgetPasswordVerifyCode = async (email, newPassword) => {
         throw error;
     }
 
-    // Need full doc with code field to mutate it
-    const user = await userModel.findOne({ email });
+    const user = await userRepository.findOneByEmailWithPassword(email);
     if (!user) {
         const error = new Error('Utilisateur introuvable');
         error.statusCode = 404;
@@ -83,14 +78,13 @@ const forgetPasswordVerifyCode = async (email, newPassword) => {
     }
 
     const code = Math.floor(1000 + Math.random() * 9000);
-    user.code = code;
-    await user.save();
+    await userRepository.update(user.id, { code });
 
     await sendEmailResetCode(email, user.username, code);
 
     const salt = await bcrypt.genSalt();
     const hashedPassword = await bcrypt.hash(newPassword, salt);
-    await userRepository.update(user._id, { password: hashedPassword });
+    await userRepository.update(user.id, { password: hashedPassword });
 };
 
 const loginUser = async (data) => {
@@ -103,14 +97,19 @@ const loginUser = async (data) => {
     }
 
     const { email, password } = data;
-    // userModel.login() is a custom static method (bcrypt compare) — stays on model
-    const user = await userModel.login(email, password);
-    const token = createToken(user._id);
 
-    await userRepository.update(user._id, { last_login: new Date() });
+    // Get full user including password for bcrypt compare
+    const user = await userRepository.findOneByEmailWithPassword(email);
+    if (!user) throw new Error('email not found');
+
+    const auth = await bcrypt.compare(password, user.password);
+    if (!auth) throw new Error('password invalid');
+
+    const token = createToken(user.id);
+    await userRepository.update(user.id, { last_login: new Date() });
 
     return {
-        user: { id: user._id, email: user.email, role: user.role, status: user.status },
+        user: { id: user.id, email: user.email, role: user.role, status: user.is_active },
         token,
         maxTime,
     };
@@ -140,16 +139,15 @@ const changePassword = async (id, currentPassword, newPassword) => {
         throw error;
     }
 
-    // verifPasswordUser is a custom static method (bcrypt compare) — stays on model
-    const change = await userModel.verifPasswordUser(id, currentPassword);
-    if (!change) {
+    const isValid = await userRepository.verifPasswordUser(id, currentPassword);
+    if (!isValid) {
         const error = new Error('Mot de passe actuel incorrect');
         error.statusCode = 401;
         throw error;
     }
 
-    const { errors, isValid } = validatePassword(newPassword);
-    if (!isValid) {
+    const { errors, isValid: passwordValid } = validatePassword(newPassword);
+    if (!passwordValid) {
         const error = new Error('Validation échouée');
         error.statusCode = 400;
         error.details = errors;
@@ -176,7 +174,7 @@ const updatePersonnelData = async (id, data, currentPassword) => {
         throw error;
     }
 
-    const match = await userModel.verifPasswordUser(id, currentPassword);
+    const match = await userRepository.verifPasswordUser(id, currentPassword);
     if (!match) {
         const error = new Error('Mot de passe actuel incorrect');
         error.statusCode = 401;

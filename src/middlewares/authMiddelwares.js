@@ -1,5 +1,5 @@
 const jwt = require("jsonwebtoken");
-const userModel = require("../models/userModel")
+const userRepository = require("../repositories/userRepository");
 
 const requireAuthUser = (req, res, next) => {
   // Accept token from cookie, Authorization header, or request body
@@ -27,7 +27,7 @@ const requireAuthUser = (req, res, next) => {
         }
         return res.status(401).json({ error: 'Invalid token' });
       } else {
-        const foundUser = await userModel.findById(decodedToken.id);
+        const foundUser = await userRepository.findById(decodedToken.id);
         if (req.session) {
           req.session.user = foundUser; // session get user
         } else {

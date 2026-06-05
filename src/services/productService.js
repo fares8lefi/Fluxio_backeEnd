@@ -1,7 +1,7 @@
-// Logique métier des produits : validation, vérifications métier et orchestration du repository — aucun accès direct au modèle Mongoose.
+// Logique métier des produits — tous les imports de modèles Mongoose remplacés par les repositories.
 const productRepository = require('../repositories/prdouctRepository');
-const supplierModel = require('../models/suppliersModel');
-const categoryModel = require('../models/categorieModel');
+const supplierRepository = require('../repositories/supplierRepository');
+const categorieRepository = require('../repositories/categorieRepository');
 const { validateProductSearch } = require('../validations/ProductValidations');
 const productValidations = require('../validations/ProductValidations');
 
@@ -15,23 +15,27 @@ const addProduct = async (data, user) => {
         throw error;
     }
 
-    const { code, barcode, name, purchase_price, selling_price, unit, stock_min, upplier, categories } = data;
+    const { code, barcode, name, purchase_price, selling_price, unit, stock_min, supplierId, categorieId } = data;
 
-    const supplier = await supplierModel.findById(upplier);
-    if (!supplier) {
-        const error = new Error('Fournisseur introuvable');
-        error.statusCode = 404;
-        throw error;
+    if (supplierId) {
+        const supplier = await supplierRepository.findById(supplierId);
+        if (!supplier) {
+            const error = new Error('Fournisseur introuvable');
+            error.statusCode = 404;
+            throw error;
+        }
     }
 
-    const cat = await categoryModel.findById(categories);
-    if (!cat) {
-        const error = new Error('Catégorie introuvable');
-        error.statusCode = 404;
-        throw error;
+    if (categorieId) {
+        const cat = await categorieRepository.getById(categorieId);
+        if (!cat) {
+            const error = new Error('Catégorie introuvable');
+            error.statusCode = 404;
+            throw error;
+        }
     }
 
-    return await productRepository.addProduct({ code, barcode, name, purchase_price, selling_price, unit, stock_min, upplier, categories });
+    return await productRepository.addProduct({ code, barcode, name, purchase_price, selling_price, unit, stock_min, supplierId, categorieId });
 };
 
 // Supprime un produit
@@ -77,7 +81,7 @@ const updateProduct = async (id, data) => {
         throw error;
     }
 
-    const { code, barcode, name, purchase_price, selling_price, unit, stock_min, supplier, categories } = data;
+    const { code, barcode, name, purchase_price, selling_price, unit, stock_min, supplierId } = data;
     const updates = {};
     if (code !== undefined) updates.code = code;
     if (barcode !== undefined) updates.barcode = barcode;
@@ -86,13 +90,12 @@ const updateProduct = async (id, data) => {
     if (selling_price !== undefined) updates.selling_price = selling_price;
     if (unit !== undefined) updates.unit = unit;
     if (stock_min !== undefined) updates.stock_min = stock_min;
-    if (supplier !== undefined) updates.supplier = supplier;
-    if (categories !== undefined) updates.categories = categories;
+    if (supplierId !== undefined) updates.supplierId = supplierId;
 
     return await productRepository.updateProduct(updates, id);
 };
 
-// Recherche par filtres dynamiques
+// Recherche par filtres dynamiques — $regex Mongoose remplacé par filtres Prisma
 const getProductByFiltres = async (data) => {
     const validationResult = validateProductSearch(data);
     if (!validationResult.isValid) {
@@ -103,14 +106,14 @@ const getProductByFiltres = async (data) => {
 
     const { name, unit, maxPrice, minPrice } = validationResult.data;
     const filter = {};
-    if (name) filter.name = { $regex: name, $options: 'i' };
+    if (name) filter.name = { contains: name };
     if (unit !== undefined) filter.unit = unit;
     if (maxPrice !== undefined && minPrice !== undefined) {
-        filter.selling_price = { $gte: minPrice, $lte: maxPrice };
+        filter.selling_price = { gte: minPrice, lte: maxPrice };
     } else if (maxPrice !== undefined) {
-        filter.selling_price = { $lte: maxPrice };
+        filter.selling_price = { lte: maxPrice };
     } else if (minPrice !== undefined) {
-        filter.selling_price = { $gte: minPrice };
+        filter.selling_price = { gte: minPrice };
     }
 
     return await productRepository.getProductByFiltres(filter);

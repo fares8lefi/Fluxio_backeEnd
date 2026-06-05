@@ -1,44 +1,63 @@
-// Couche d'accès aux données pour les fournisseurs : centralise toutes les opérations Mongoose du module supplier.
-const Supplier = require('../models/suppliersModel');
+const prisma = require('../../config/db');
 
 // Crée un fournisseur
 const create = async (data) => {
-    return await Supplier.create(data);
+    return await prisma.suppliers.create({ data });
 };
 
 // Récupère tous les fournisseurs
 const findAll = async () => {
-    return await Supplier.find();
+    return await prisma.suppliers.findMany();
 };
 
-// Récupère les fournisseurs actifs
+// Récupère les fournisseurs actifs (champs limités)
 const findActive = async () => {
-    return await Supplier.find({ is_active: true }).select('name code email phone address');
+    return await prisma.suppliers.findMany({
+        where: { is_active: true },
+        select: {
+            id: true, name: true, code: true,
+            email: true, phone: true, address: true,
+        },
+    });
 };
 
 // Récupère un fournisseur par ID
 const findById = async (id) => {
-    return await Supplier.findById(id);
+    return await prisma.suppliers.findUnique({
+        where: { id: parseInt(id) },
+    });
 };
 
 // Recherche des fournisseurs par nom (insensible à la casse)
 const findByName = async (name) => {
-    return await Supplier.find({ name: { $regex: name, $options: 'i' } });
+    return await prisma.suppliers.findMany({
+        where: {
+            name: { contains: name },
+        },
+    });
 };
 
 // Met à jour un fournisseur
 const update = async (id, updates) => {
-    return await Supplier.findByIdAndUpdate(id, updates, { new: true });
+    return await prisma.suppliers.update({
+        where: { id: parseInt(id) },
+        data: updates,
+    });
 };
 
 // Supprime un fournisseur
 const deleteById = async (id) => {
-    return await Supplier.findByIdAndDelete(id);
+    return await prisma.suppliers.delete({
+        where: { id: parseInt(id) },
+    });
 };
 
 // Désactive un fournisseur (is_active = false)
 const deactivate = async (id) => {
-    return await Supplier.findByIdAndUpdate(id, { is_active: false }, { new: true });
+    return await prisma.suppliers.update({
+        where: { id: parseInt(id) },
+        data: { is_active: false },
+    });
 };
 
 module.exports = {

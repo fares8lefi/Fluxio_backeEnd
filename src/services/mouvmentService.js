@@ -1,22 +1,27 @@
-// Logique métier des mouvements de stock : l'import direct de productModel remplacé par productRepository, conformément à l'architecture en couches.
+// Logique métier des mouvements de stock — product.save() remplacé par updateProduct du repository.
 const mouvmentRepository = require('../repositories/mouvmentRepository');
 const productRepository = require('../repositories/prdouctRepository');
+const prisma = require('../../config/db');
 const { validateMouvmentRegistration } = require('../validations/mouvmentValidations');
 
 // Augmente le stock d'un produit
 const increaseStock = async (productId, quantity) => {
-    const product = await productRepository.getProductById(productId);
+    const product = await prisma.product.findUnique({ where: { id: parseInt(productId) } });
     if (!product) throw new Error('Produit introuvable');
-    product.unit += quantity;
-    await product.save();
+    await prisma.product.update({
+        where: { id: parseInt(productId) },
+        data: { unit: product.unit + quantity },
+    });
 };
 
 // Diminue le stock d'un produit
 const decreaseStock = async (productId, quantity) => {
-    const product = await productRepository.getProductById(productId);
+    const product = await prisma.product.findUnique({ where: { id: parseInt(productId) } });
     if (!product) throw new Error('Produit introuvable');
-    product.unit -= quantity;
-    await product.save();
+    await prisma.product.update({
+        where: { id: parseInt(productId) },
+        data: { unit: product.unit - quantity },
+    });
 };
 
 // Crée un nouveau mouvement avec gestion des stocks
@@ -27,7 +32,7 @@ const createMouvment = async (data, user) => {
         throw error;
     }
 
-    data.created_by = user._id;
+    data.createdById = user.id;
 
     // Définir le prix unitaire si non fourni
     if (data.items && Array.isArray(data.items)) {
@@ -51,7 +56,7 @@ const createMouvment = async (data, user) => {
         throw error;
     }
 
-    const { type, items, supplier, reference, note, status, created_by } = data;
+    const { type, items, supplierId, reference, note, status, createdById } = data;
 
     // Vérifier le stock pour les sorties
     if (['OUT', 'RETURN_SUPPLIER'].includes(type)) {
@@ -82,11 +87,11 @@ const createMouvment = async (data, user) => {
     return await mouvmentRepository.create({
         type,
         items,
-        supplier,
+        supplierId: supplierId || null,
         reference: reference || null,
         note: note || null,
         status: status || 'CONFIRMED',
-        created_by,
+        createdById,
     });
 };
 

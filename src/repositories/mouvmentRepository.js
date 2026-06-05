@@ -7,13 +7,13 @@ const create = async (data) => {
     return await prisma.movement.create({
         data: {
             ...rest,
-            supplier: supplierId ? { connect: { id: parseInt(supplierId) } } : undefined,
-            created_by: { connect: { id: parseInt(createdById) } },
+            supplier: supplierId ? { connect: { id: supplierId } } : undefined,
+            created_by: { connect: { id: createdById } },
             items: {
                 create: items.map((item) => ({
                     unit: item.unit,
                     unit_price: item.unit_price ?? null,
-                    product: { connect: { id: parseInt(item.product) } },
+                    product: { connect: { id: item.product } },
                 })),
             },
         },

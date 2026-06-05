@@ -30,7 +30,7 @@ const findOneByEmailWithPassword = async (email) => {
 // Recherche par ID (sans le mot de passe)
 const findById = async (id) => {
     return await prisma.user.findUnique({
-        where: { id: parseInt(id) },
+        where: { id: id },
         select: {
             id: true, username: true, email: true,
             role: true, is_active: true, phone: true,
@@ -41,13 +41,13 @@ const findById = async (id) => {
 
 // Recherche par ID AVEC mot de passe (pour vérification)
 const findByIdWithPassword = async (id) => {
-    return await prisma.user.findUnique({ where: { id: parseInt(id) } });
+    return await prisma.user.findUnique({ where: { id: id } });
 };
 
 // Met à jour un utilisateur
 const update = async (id, updates) => {
     return await prisma.user.update({
-        where: { id: parseInt(id) },
+        where: { id: id },
         data: updates,
         select: {
             id: true, username: true, email: true,

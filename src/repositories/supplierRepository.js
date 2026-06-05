@@ -24,7 +24,7 @@ const findActive = async () => {
 // Récupère un fournisseur par ID
 const findById = async (id) => {
     return await prisma.suppliers.findUnique({
-        where: { id: parseInt(id) },
+        where: { id: id },
     });
 };
 
@@ -40,7 +40,7 @@ const findByName = async (name) => {
 // Met à jour un fournisseur
 const update = async (id, updates) => {
     return await prisma.suppliers.update({
-        where: { id: parseInt(id) },
+        where: { id: id },
         data: updates,
     });
 };
@@ -48,14 +48,14 @@ const update = async (id, updates) => {
 // Supprime un fournisseur
 const deleteById = async (id) => {
     return await prisma.suppliers.delete({
-        where: { id: parseInt(id) },
+        where: { id: id },
     });
 };
 
 // Désactive un fournisseur (is_active = false)
 const deactivate = async (id) => {
     return await prisma.suppliers.update({
-        where: { id: parseInt(id) },
+        where: { id: id },
         data: { is_active: false },
     });
 };

@@ -7,8 +7,8 @@ const addProduct = async (data) => {
     return await prisma.product.create({
         data: {
             ...rest,
-            supplier:  supplierId  ? { connect: { id: parseInt(supplierId) } }  : undefined,
-            categorie: categorieId ? { connect: { id: parseInt(categorieId) } } : undefined,
+            supplier:  supplierId  ? { connect: { id: supplierId } }  : undefined,
+            categorie: categorieId ? { connect: { id: categorieId } } : undefined,
         },
         include: { supplier: true, categorie: true },
     });
@@ -18,14 +18,14 @@ const addProduct = async (data) => {
 const updateProduct = async (data, id) => {
     const { categorieId, supplierId, ...rest } = data;
     return await prisma.product.update({
-        where: { id: parseInt(id) },
+        where: { id: id },
         data: {
             ...rest,
             supplier: supplierId !== undefined
-                ? supplierId ? { connect: { id: parseInt(supplierId) } } : { disconnect: true }
+                ? supplierId ? { connect: { id: supplierId } } : { disconnect: true }
                 : undefined,
             categorie: categorieId !== undefined
-                ? categorieId ? { connect: { id: parseInt(categorieId) } } : { disconnect: true }
+                ? categorieId ? { connect: { id: categorieId } } : { disconnect: true }
                 : undefined,
         },
         include: { supplier: true, categorie: true },
@@ -56,7 +56,7 @@ const countAll = async () => {
 // Récupère un produit par ID (champs limités + relations)
 const getProductById = async (id) => {
     return await prisma.product.findUnique({
-        where: { id: parseInt(id) },
+        where: { id: id },
         select: {
             id: true, code: true, name: true, unit: true,
             purchase_price: true, selling_price: true, stock_min: true,
@@ -69,7 +69,7 @@ const getProductById = async (id) => {
 // Supprime un produit
 const deleteProduct = async (id) => {
     return await prisma.product.delete({
-        where: { id: parseInt(id) },
+        where: { id: id },
     });
 };
 

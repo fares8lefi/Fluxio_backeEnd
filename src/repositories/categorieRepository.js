@@ -8,7 +8,7 @@ const getAll = async () => {
 // Récupère une catégorie par ID
 const getById = async (id) => {
     return await prisma.categorie.findUnique({
-        where: { id: parseInt(id) },
+        where: { id: id },
     });
 };
 
@@ -20,7 +20,7 @@ const create = async (data) => {
 // Met à jour une catégorie par ID
 const update = async (id, updates) => {
     return await prisma.categorie.update({
-        where: { id: parseInt(id) },
+        where: { id: id },
         data: updates,
     });
 };
@@ -28,7 +28,7 @@ const update = async (id, updates) => {
 // Supprime une catégorie par ID
 const deleteById = async (id) => {
     return await prisma.categorie.delete({
-        where: { id: parseInt(id) },
+        where: { id: id },
     });
 };
 

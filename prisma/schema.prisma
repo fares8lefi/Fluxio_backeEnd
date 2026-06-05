@@ -37,92 +37,106 @@ enum MovementStatus {
 // ─────────────────────────────────────────
 
 model User {
-  id          Int        @id @default(autoincrement())
-  username    String     @unique
-  email       String     @unique
-  password    String
-  role        Role       @default(user)
-  code        Int?
-  is_active   Boolean    @default(false)
-  phone       String?    @unique
-  created_at  DateTime   @default(now())
-  last_login  DateTime?
+  id         Int       @id @default(autoincrement())
+  username   String    @unique
+  email      String    @unique
+  password   String
+  role       Role      @default(user)
+  code       Int?
+  is_active  Boolean   @default(false)
+  phone      String?   @unique
+  created_at DateTime  @default(now())
+  last_login DateTime?
 
-  movements   Movement[]
+  movements Movement[]
 }
 
 model Categorie {
-  id          Int        @id @default(autoincrement())
-  name        String     @unique
-  code        Int        @unique
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  code        Int      @unique
   description String?
-  is_active   Boolean    @default(true)
-  created_at  DateTime   @default(now())
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
 
-  products    Product[]
+  products Product[]
 }
 
 model Suppliers {
-  id          Int                @id @default(autoincrement())
-  name        String
-  code        Int?               @unique
-  email       String?            @unique
-  phone       String             @unique
-  address     String?
-  is_active   Boolean            @default(true)
-  created_at  DateTime           @default(now())
+  id         Int      @id @default(autoincrement())
+  name       String
+  code       Int?     @unique
+  email      String?  @unique
+  phone      String   @unique
+  address    String?
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
 
-  products    Product[]
-  movements   Movement[]
+  products  Product[]
+  movements Movement[]
 }
 
 model Product {
-  id             Int        @id @default(autoincrement())
-  code           Int        @unique
-  barcode        Int        @unique
+  id             Int    @id @default(autoincrement())
+  code           Int    @unique
+  barcode        Int    @unique
   name           String
   purchase_price Float
   selling_price  Float
   unit           Int
   stock_min      Int
 
-  supplier       Suppliers? @relation(fields: [supplierId], references: [id])
-  supplierId     Int?
+  supplier   Suppliers? @relation(fields: [supplierId], references: [id])
+  supplierId Int?
 
   // Un produit appartient à une seule catégorie
-  categorie      Categorie? @relation(fields: [categorieId], references: [id])
-  categorieId    Int?
+  categorie   Categorie? @relation(fields: [categorieId], references: [id])
+  categorieId Int?
 
-  movementItems  MovementItem[]
+  movementItems MovementItem[]
 }
 
 // Replaces the embedded `items` array in the Mongoose Mouvment model
 model Movement {
-  id          Int            @id @default(autoincrement())
-  type        MovementType
-  reference   String?
-  note        String?
-  status      MovementStatus @default(CONFIRMED)
-  created_at  DateTime       @default(now())
+  id         Int            @id @default(autoincrement())
+  type       MovementType
+  reference  String?
+  note       String?
+  status     MovementStatus @default(CONFIRMED)
+  created_at DateTime       @default(now())
 
-  supplier    Suppliers?     @relation(fields: [supplierId], references: [id])
-  supplierId  Int?
+  supplier   Suppliers? @relation(fields: [supplierId], references: [id])
+  supplierId Int?
 
-  created_by  User           @relation(fields: [createdById], references: [id])
+  client   Client? @relation(fields: [clientId], references: [id])
+  clientId Int?
+
+  created_by  User @relation(fields: [createdById], references: [id])
   createdById Int
 
-  items       MovementItem[]
+  items MovementItem[]
 }
 
 // Replaces the embedded items[] sub-documents in Mongoose
 model MovementItem {
-  id          Int      @id @default(autoincrement())
-  unit        Int
-  unit_price  Float?
+  id         Int    @id @default(autoincrement())
+  unit       Int
+  unit_price Float?
 
-  movement    Movement @relation(fields: [movementId], references: [id])
-  movementId  Int
+  movement   Movement @relation(fields: [movementId], references: [id])
+  movementId Int
 
-  product     Product  @relation(fields: [productId], references: [id])
-  productId   Int
+  product   Product @relation(fields: [productId], references: [id])
+  productId Int
+}
+
+model Client {
+  id               Int     @id @default(autoincrement())
+  name             String
+  phone            String  @unique
+  matriculeFiscale String?
+  codeTva          Float?
+  is_active        Boolean @default(true)
+
+  movements Movement[]
 }

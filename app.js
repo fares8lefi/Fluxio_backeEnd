@@ -4,6 +4,7 @@ const cookieParser = require("cookie-parser");
 const logger = require("morgan");
 const session = require("express-session");
 require("dotenv").config();
+const prisma = require("./config/db");
 
 const usersRouter = require("./src/routes/usersRouter");
 const categorieRouter = require("./src/routes/categorieRouter");
@@ -11,8 +12,6 @@ const suppliersRouter = require("./src/routes/suppliersRouter");
 const productRouter = require("./src/routes/productRouter");
 const mouvmentRouter = require("./src/routes/mouvmentRouter");
 
-
-const { connectToDb } = require("./config/db");
 
 const app = express();
 
@@ -66,9 +65,16 @@ const server = http.createServer(app);
 
 const PORT = process.env.PORT || 3000;
 
-server.listen(PORT, "0.0.0.0", async () => {
-  await connectToDb();
-  console.log(`Server is running on port ${PORT}`);
-});
+prisma.$connect()
+  .then(() => {
+    console.log(" Connecté avec succès à la base de données MySQL !");
+    server.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server is running on port ${PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error(" Erreur de connexion à la base de données :", err);
+    process.exit(1);
+  });
 
 module.exports = app;

@@ -37,7 +37,7 @@ enum MovementStatus {
 // ─────────────────────────────────────────
 
 model User {
-  id         Int       @id @default(autoincrement())
+  id         String    @id @default(uuid())
   username   String    @unique
   email      String    @unique
   password   String
@@ -52,7 +52,7 @@ model User {
 }
 
 model Categorie {
-  id          Int      @id @default(autoincrement())
+  id          String   @id @default(uuid())
   name        String   @unique
   code        Int      @unique
   description String?
@@ -63,7 +63,7 @@ model Categorie {
 }
 
 model Suppliers {
-  id         Int      @id @default(autoincrement())
+  id         String   @id @default(uuid())
   name       String
   code       Int?     @unique
   email      String?  @unique
@@ -77,7 +77,7 @@ model Suppliers {
 }
 
 model Product {
-  id             Int    @id @default(autoincrement())
+  id             String @id @default(uuid())
   code           Int    @unique
   barcode        Int    @unique
   name           String
@@ -87,18 +87,16 @@ model Product {
   stock_min      Int
 
   supplier   Suppliers? @relation(fields: [supplierId], references: [id])
-  supplierId Int?
+  supplierId String?
 
-  // Un produit appartient à une seule catégorie
   categorie   Categorie? @relation(fields: [categorieId], references: [id])
-  categorieId Int?
+  categorieId String?
 
   movementItems MovementItem[]
 }
 
-// Replaces the embedded `items` array in the Mongoose Mouvment model
 model Movement {
-  id         Int            @id @default(autoincrement())
+  id         String         @id @default(uuid())
   type       MovementType
   reference  String?
   note       String?
@@ -106,32 +104,31 @@ model Movement {
   created_at DateTime       @default(now())
 
   supplier   Suppliers? @relation(fields: [supplierId], references: [id])
-  supplierId Int?
+  supplierId String?
 
   client   Client? @relation(fields: [clientId], references: [id])
-  clientId Int?
+  clientId String?
 
-  created_by  User @relation(fields: [createdById], references: [id])
-  createdById Int
+  created_by  User   @relation(fields: [createdById], references: [id])
+  createdById String
 
   items MovementItem[]
 }
 
-// Replaces the embedded items[] sub-documents in Mongoose
 model MovementItem {
-  id         Int    @id @default(autoincrement())
+  id         String @id @default(uuid())
   unit       Int
   unit_price Float?
 
   movement   Movement @relation(fields: [movementId], references: [id])
-  movementId Int
+  movementId String
 
   product   Product @relation(fields: [productId], references: [id])
-  productId Int
+  productId String
 }
 
 model Client {
-  id               Int     @id @default(autoincrement())
+  id               String  @id @default(uuid())
   name             String
   phone            String  @unique
   matriculeFiscale String?

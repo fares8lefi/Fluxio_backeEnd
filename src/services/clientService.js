@@ -59,7 +59,7 @@ const getClientByID = async (id) => {
     const client = await clientRepository.getClientByMatriculeFiscale(id);
     if(!client) {
         const error = new Error('client not  found ');
-        error.statusCode = 401;
+        error.statusCode = 400;
         throw error;
     }
     return client;
@@ -68,11 +68,21 @@ const getClientByID = async (id) => {
 const getAllClients = async () => {
     const clients = await clientRepository.getAllClients();
     if(!clients) {
-        const error = new Error('client not  found ');
-        error.statusCode = 401;
+        const error = new Error('client is required ');
+        error.statusCode = 400;
         throw error;
     }
     return clients;
+}
+
+const searchClientsByName = async (name) => {
+    if(!name) {
+       const error = new Error('name is required');
+       error.statusCode = 400;
+       throw error;
+    }
+   return  clientRepository.searchClientsByName(name);
+
 }
 module.exports = {
     createClient,
@@ -81,4 +91,5 @@ module.exports = {
     getClientByMatriculeFiscale,
     getClientByID,
     getAllClients,
+    searchClientsByName,
 }

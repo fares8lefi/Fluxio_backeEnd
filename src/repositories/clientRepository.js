@@ -31,18 +31,43 @@ const updateClient = async (id,updates) => {
         }
     })
  }
- const getClinetByID = async (id) => {
+ const getClientByID = async (id) => {
     return   prisma.client.findUnique({where:{id}})
  }
 
- const getAllClients = async (id) => {
-    return   prisma.client.findMany()
+ const getAllClients = async () => {
+    const clients = await   prisma.client.findMany()
+     if(clients.length ===0){
+         const error = new Error('client not found')
+         error.statusCode = 404
+         throw error
+     }
+     return clients
  }
+const searchClientsByName = async (name) => {
+    const clients = await prisma.client.findMany({
+        where: {
+            name: {
+                contains: name,
+            }
+        }
+    })
+
+    if (clients.length === 0) {
+        const error = new Error('no clients found')
+        error.statusCode = 404
+        throw error
+    }
+
+    return clients
+}
+
 module.exports = {
     addClient,
     getClientByMatriculeFiscale,
     getAllClients,
     updateClient,
     deleteClient,
-    getClinetByID
+    getClientByID,
+    searchClientsByName
 }

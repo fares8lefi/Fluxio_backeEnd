@@ -7,5 +7,6 @@ router.post('/createClient',clientController.createClient)
 router.put('/updateClient/:id' ,clientController.updateClient)
 router.delete('/deleteClient/:id' ,clientController.deleteClient)
 router.get("/getAllClients",clientController.getAllClients)
-router.get('/getClinetByMatrcuileFiscale/:mf',clientController.getClinetByMatrcuileFiscale)
+router.get('/getClientByMatriculeFiscale/:mf',clientController.getClientByMatriculeFiscale)
+router.get('/searchClientsByName',clientController.searchClientsByName)
 module.exports = router;

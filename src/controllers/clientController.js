@@ -1,5 +1,5 @@
 const clientService = require('../services/clientService');
-const categorieService = require("../services/categorieService");
+
 
 
 module.exports.createClient = async (req, res) => {
@@ -64,7 +64,7 @@ module.exports.getAllClients = async (_req, res) => {
     }
 }
 
-module.exports.getClinetByMatrcuileFiscale = async (req, res) => {
+module.exports.getClientByMatriculeFiscale= async (req, res) => {
    try{
        console.log(req.params.mf);
        const client = await clientService.getClientByMatriculeFiscale(req.params.mf);
@@ -78,4 +78,18 @@ module.exports.getClinetByMatrcuileFiscale = async (req, res) => {
            ...(error.details && { details: error.details }),
        })
    }
+}
+
+module.exports.searchClientsByName = async (req, res) => {
+    try {
+        const clients = await clientService.searchClientsByName(req.query.name);
+        res.status(200).json({success: true, clients});
+    }catch (error) {
+        const statusCode = error.statusCode || 500;
+        return res.status(statusCode).json({
+            success: false,
+            message: error.message,
+            ...(error.details && { details: error.details }),
+        })
+    }
 }

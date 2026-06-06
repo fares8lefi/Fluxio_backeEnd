@@ -37,7 +37,7 @@ enum MovementStatus {
 // ─────────────────────────────────────────
 
 model User {
-  id         String    @id @default(uuid())
+  id         String    @id @default(cuid())
   username   String    @unique
   email      String    @unique
   password   String
@@ -49,10 +49,11 @@ model User {
   last_login DateTime?
 
   movements Movement[]
+  clients   Client[]
 }
 
 model Categorie {
-  id          String   @id @default(uuid())
+  id          String   @id @default(cuid())
   name        String   @unique
   code        Int      @unique
   description String?
@@ -63,7 +64,7 @@ model Categorie {
 }
 
 model Suppliers {
-  id         String   @id @default(uuid())
+  id         String   @id @default(cuid())
   name       String
   code       Int?     @unique
   email      String?  @unique
@@ -77,7 +78,7 @@ model Suppliers {
 }
 
 model Product {
-  id             String @id @default(uuid())
+  id             String @id @default(cuid())
   code           Int    @unique
   barcode        Int    @unique
   name           String
@@ -96,7 +97,7 @@ model Product {
 }
 
 model Movement {
-  id         String         @id @default(uuid())
+  id         String         @id @default(cuid())
   type       MovementType
   reference  String?
   note       String?
@@ -116,7 +117,7 @@ model Movement {
 }
 
 model MovementItem {
-  id         String @id @default(uuid())
+  id         String @id @default(cuid())
   unit       Int
   unit_price Float?
 
@@ -128,12 +129,15 @@ model MovementItem {
 }
 
 model Client {
-  id               String  @id @default(uuid())
+  id               String  @id @default(cuid())
   name             String
   phone            String  @unique
-  matriculeFiscale String?
+  matriculeFiscale String  @unique
   codeTva          Float?
   is_active        Boolean @default(true)
 
   movements Movement[]
+
+  user   User?   @relation(fields: [userId], references: [id])
+  userId String?
 }

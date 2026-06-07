@@ -2,7 +2,7 @@ const categorieRepository = require('../repositories/categorieRepository');
 const { validateCategorieRegistration, validateCategorieUpdate } = require('../validations/CategorieValidations');
 
 // Crée une nouvelle catégorie
-const createCategory = async (data) => {
+const createCategory = async (data, companyId) => {
     const validationResult = validateCategorieRegistration(data);
     if (!validationResult.isValid) {
         const error = new Error('Validation échouée');
@@ -13,23 +13,23 @@ const createCategory = async (data) => {
 
     const { name, code, description } = data;
 
-    const alreadyExists = await categorieRepository.existsWithCodeOrName(code, name);
+    const alreadyExists = await categorieRepository.existsWithCodeOrName(code, name, companyId);
     if (alreadyExists) {
         const error = new Error('Une catégorie avec ce nom ou ce code existe déjà');
         error.statusCode = 409;
         throw error;
     }
 
-    return await categorieRepository.create({ name, code, description });
+    return await categorieRepository.create({ name, code, description, companyId });
 };
 
 // Récupère toutes les catégories
-const getAllCategories = async () => {
-    return await categorieRepository.getAll();
+const getAllCategories = async (companyId) => {
+    return await categorieRepository.getAll(companyId);
 };
 
 // Met à jour une catégorie existante
-const updateCategory = async (id, data) => {
+const updateCategory = async (id, data, companyId) => {
     const validationResult = validateCategorieUpdate(data);
     if (!validationResult.isValid) {
         const error = new Error('Validation échouée');
@@ -38,7 +38,7 @@ const updateCategory = async (id, data) => {
         throw error;
     }
 
-    const categorie = await categorieRepository.getById(id);
+    const categorie = await categorieRepository.getById(id, companyId);
     if (!categorie) {
         const error = new Error('Catégorie introuvable');
         error.statusCode = 404;
@@ -55,8 +55,8 @@ const updateCategory = async (id, data) => {
 };
 
 // Supprime une catégorie
-const deleteCategory = async (id) => {
-    const categorie = await categorieRepository.getById(id);
+const deleteCategory = async (id, companyId) => {
+    const categorie = await categorieRepository.getById(id, companyId);
     if (!categorie) {
         const error = new Error('Catégorie introuvable');
         error.statusCode = 404;

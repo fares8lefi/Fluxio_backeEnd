@@ -87,7 +87,7 @@ const htmlTemplate = (username, otpDigits) => `<!DOCTYPE html>
   .otp-digit {
     width: 58px; height: 68px;
     background: #1A2236;
-    border: 1.5px solid #2A3A55;
+    border: 1px solid #2A3A55;
     border-radius: 14px;
     display: flex; align-items: center; justify-content: center;
     text-align: center;

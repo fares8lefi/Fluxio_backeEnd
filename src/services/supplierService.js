@@ -3,7 +3,7 @@ const supplierRepository = require('../repositories/supplierRepository');
 const { validateSupplierRegistration, validateSupplierUpdate } = require('../validations/SuppliersValidations');
 
 // Crée un fournisseur avec validation
-const addSupplier = async (data) => {
+const addSupplier = async (data, companyId) => {
     const validationResult = validateSupplierRegistration(data);
     if (!validationResult.isValid) {
         const error = new Error('Validation échouée');
@@ -13,11 +13,11 @@ const addSupplier = async (data) => {
     }
 
     const { name, code, email, phone, address } = data;
-    return await supplierRepository.create({ name, code, email, phone, address });
+    return await supplierRepository.create({ name, code, email, phone, address, companyId });
 };
 
 // Met à jour un fournisseur avec validation
-const updateSupplier = async (id, data) => {
+const updateSupplier = async (id, data, companyId) => {
     const validationResult = validateSupplierUpdate(data);
     if (!validationResult.isValid) {
         const error = new Error('Validation échouée');
@@ -26,7 +26,7 @@ const updateSupplier = async (id, data) => {
         throw error;
     }
 
-    const existing = await supplierRepository.findById(id);
+    const existing = await supplierRepository.findById(id, companyId);
     if (!existing) {
         const error = new Error('Fournisseur introuvable');
         error.statusCode = 404;
@@ -45,8 +45,8 @@ const updateSupplier = async (id, data) => {
 };
 
 // Supprime un fournisseur
-const deleteSupplier = async (id) => {
-    const existing = await supplierRepository.findById(id);
+const deleteSupplier = async (id, companyId) => {
+    const existing = await supplierRepository.findById(id, companyId);
     if (!existing) {
         const error = new Error('Fournisseur introuvable');
         error.statusCode = 404;
@@ -56,28 +56,28 @@ const deleteSupplier = async (id) => {
 };
 
 // Récupère les fournisseurs actifs
-const getActiveSuppliers = async () => {
-    return await supplierRepository.findActive();
+const getActiveSuppliers = async (companyId) => {
+    return await supplierRepository.findActive(companyId);
 };
 
 // Récupère tous les fournisseurs
-const getAllSuppliers = async () => {
-    return await supplierRepository.findAll();
+const getAllSuppliers = async (companyId) => {
+    return await supplierRepository.findAll(companyId);
 };
 
 // Recherche par nom
-const searchSuppliersByName = async (name) => {
+const searchSuppliersByName = async (name, companyId) => {
     if (!name) {
         const error = new Error('Le paramètre name est requis');
         error.statusCode = 400;
         throw error;
     }
-    return await supplierRepository.findByName(name);
+    return await supplierRepository.findByName(name, companyId);
 };
 
 // Désactive un fournisseur
-const deactivateSupplier = async (id) => {
-    const existing = await supplierRepository.findById(id);
+const deactivateSupplier = async (id, companyId) => {
+    const existing = await supplierRepository.findById(id, companyId);
     if (!existing) {
         const error = new Error('Fournisseur introuvable');
         error.statusCode = 404;

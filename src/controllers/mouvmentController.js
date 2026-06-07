@@ -26,7 +26,8 @@ module.exports.createMouvment = async (req, res) => {
 module.exports.getAllMouvment = async (req, res) => {
     try {
         const { numbrePage } = req.query;
-        const result = await mouvmentService.getAllMouvments(numbrePage);
+        const user = (req.session && req.session.user) ? req.session.user : req.user;
+        const result = await mouvmentService.getAllMouvments(numbrePage, user.companyId);
         
         return res.status(200).json({ 
             success: true, 

@@ -2,18 +2,18 @@ const prisma = require('../../config/db');
 
 // Crée un fournisseur
 const create = async (data) => {
-    return await prisma.suppliers.create({ data });
+    return  prisma.supplier.create({ data });
 };
 
-// Récupère tous les fournisseurs
-const findAll = async () => {
-    return await prisma.suppliers.findMany();
+// Récupère tous les fournisseurs de la compagnie
+const findAll = async (companyId) => {
+    return  prisma.supplier.findMany({ where: { companyId } });
 };
 
 // Récupère les fournisseurs actifs (champs limités)
-const findActive = async () => {
-    return await prisma.suppliers.findMany({
-        where: { is_active: true },
+const findActive = async (companyId) => {
+    return  prisma.supplier.findMany({
+        where: { is_active: true, companyId },
         select: {
             id: true, name: true, code: true,
             email: true, phone: true, address: true,
@@ -21,41 +21,42 @@ const findActive = async () => {
     });
 };
 
-// Récupère un fournisseur par ID
-const findById = async (id) => {
-    return await prisma.suppliers.findUnique({
-        where: { id: id },
+// Récupère un fournisseur par ID (vérifie l'appartenance à la compagnie)
+const findById = async (id, companyId) => {
+    return  prisma.supplier.findFirst({
+        where: { id, companyId },
     });
 };
 
 // Recherche des fournisseurs par nom (insensible à la casse)
-const findByName = async (name) => {
-    return await prisma.suppliers.findMany({
+const findByName = async (name, companyId) => {
+    return  prisma.supplier.findMany({
         where: {
             name: { contains: name },
+            companyId,
         },
     });
 };
 
 // Met à jour un fournisseur
 const update = async (id, updates) => {
-    return await prisma.suppliers.update({
-        where: { id: id },
+    return  prisma.supplier.update({
+        where: { id },
         data: updates,
     });
 };
 
 // Supprime un fournisseur
 const deleteById = async (id) => {
-    return await prisma.suppliers.delete({
-        where: { id: id },
+    return  prisma.supplier.delete({
+        where: { id },
     });
 };
 
-// Désactive un fournisseur (is_active = false)
+// Désactive un fournisseur (soft delete)
 const deactivate = async (id) => {
-    return await prisma.suppliers.update({
-        where: { id: id },
+    return  prisma.supplier.update({
+        where: { id },
         data: { is_active: false },
     });
 };

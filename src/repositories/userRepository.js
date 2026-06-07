@@ -5,65 +5,65 @@ const bcrypt = require('bcrypt');
 const create = async (data) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(data.password, salt);
-    return await prisma.user.create({
+    return  prisma.user.create({
         data: { ...data, password: hashedPassword },
     });
 };
 
 // Recherche par email (sans le mot de passe)
 const findOneByEmail = async (email) => {
-    return await prisma.user.findUnique({
+    return  prisma.user.findUnique({
         where: { email },
         select: {
             id: true, username: true, email: true,
             role: true, is_active: true, phone: true,
-            created_at: true, last_login: true,
+            created_at: true, last_login: true, companyId: true,
         },
     });
 };
 
 // Recherche par email AVEC mot de passe (pour la connexion)
 const findOneByEmailWithPassword = async (email) => {
-    return await prisma.user.findUnique({ where: { email } });
+    return  prisma.user.findUnique({ where: { email } });
 };
 
 // Recherche par ID (sans le mot de passe)
 const findById = async (id) => {
-    return await prisma.user.findUnique({
+    return  prisma.user.findUnique({
         where: { id: id },
         select: {
             id: true, username: true, email: true,
             role: true, is_active: true, phone: true,
-            created_at: true, last_login: true,
+            created_at: true, last_login: true, companyId: true,
         },
     });
 };
 
 // Recherche par ID AVEC mot de passe (pour vérification)
 const findByIdWithPassword = async (id) => {
-    return await prisma.user.findUnique({ where: { id: id } });
+    return  prisma.user.findUnique({ where: { id: id } });
 };
 
 // Met à jour un utilisateur
 const update = async (id, updates) => {
-    return await prisma.user.update({
+    return  prisma.user.update({
         where: { id: id },
         data: updates,
         select: {
             id: true, username: true, email: true,
             role: true, is_active: true, phone: true,
-            created_at: true, last_login: true,
+            created_at: true, last_login: true, companyId: true,
         },
     });
 };
 
 // Récupère tous les utilisateurs (sans mot de passe ni code)
 const findAll = async () => {
-    return await prisma.user.findMany({
+    return  prisma.user.findMany({
         select: {
             id: true, username: true, email: true,
             role: true, is_active: true, phone: true,
-            created_at: true, last_login: true,
+            created_at: true, last_login: true, companyId: true,
         },
     });
 };
@@ -72,7 +72,7 @@ const findAll = async () => {
 const verifPasswordUser = async (id, currentPassword) => {
     const user = await findByIdWithPassword(id);
     if (!user) return false;
-    return await bcrypt.compare(currentPassword, user.password);
+    return  bcrypt.compare(currentPassword, user.password);
 };
 
 module.exports = {

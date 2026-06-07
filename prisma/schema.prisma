@@ -36,23 +36,41 @@ enum MovementStatus {
 // Models
 // ─────────────────────────────────────────
 
-model User {
-  id         String    @id @default(cuid())
-  username   String    @unique
-  email      String    @unique
-  password   String
-  role       Role      @default(user)
-  code       Int?
-  is_active  Boolean   @default(false)
-  phone      String?   @unique
-  created_at DateTime  @default(now())
-  last_login DateTime?
+model Company {
+  id         String   @id @default(cuid())
+  name       String
+  created_at DateTime @default(now())
+  is_active  Boolean  @default(true)
 
-  movements Movement[]
-  clients   Client[]
+  users      User[]
+  categories Category[]
+  suppliers  Supplier[]
+  products   Product[]
+  movements  Movement[]
+  clients    Client[]
 }
 
-model Categorie {
+model User {
+  id              String    @id @default(cuid())
+  username        String    @unique
+  email           String    @unique
+  password        String
+  role            Role      @default(user)
+  // Code OTP de vérification (4 chiffres)
+  code            Int?
+  code_expires_at DateTime? // Expiration du code OTP — obligatoire pour la sécurité
+  is_active       Boolean   @default(false)
+  phone           String?   @unique
+  created_at      DateTime  @default(now())
+  last_login      DateTime?
+
+  company   Company? @relation(fields: [companyId], references: [id])
+  companyId String?
+
+  movements Movement[]
+}
+
+model Category {
   id          String   @id @default(cuid())
   name        String   @unique
   code        Int      @unique
@@ -60,10 +78,13 @@ model Categorie {
   is_active   Boolean  @default(true)
   created_at  DateTime @default(now())
 
+  company   Company? @relation(fields: [companyId], references: [id])
+  companyId String?
+
   products Product[]
 }
 
-model Suppliers {
+model Supplier {
   id         String   @id @default(cuid())
   name       String
   code       Int?     @unique
@@ -72,6 +93,9 @@ model Suppliers {
   address    String?
   is_active  Boolean  @default(true)
   created_at DateTime @default(now())
+
+  company   Company? @relation(fields: [companyId], references: [id])
+  companyId String?
 
   products  Product[]
   movements Movement[]
@@ -84,27 +108,42 @@ model Product {
   name           String
   purchase_price Float
   selling_price  Float
-  unit           Int
+  // Quantité en stock (champ de stock actuel)
+  stock_quantity Int    @default(0)
   stock_min      Int
+  stock_max      Int?
 
-  supplier   Suppliers? @relation(fields: [supplierId], references: [id])
+  // TVA tunisienne (obligatoire légalement) : 0, 7, 13, ou 19%
+  tva_rate Int @default(19)
+
+  unit_of_measure String @default("pièce") // kg, litre, pièce, etc.
+
+  supplier   Supplier? @relation(fields: [supplierId], references: [id])
   supplierId String?
 
-  categorie   Categorie? @relation(fields: [categorieId], references: [id])
-  categorieId String?
+  category   Category? @relation(fields: [categoryId], references: [id])
+  categoryId String?
+
+  company   Company? @relation(fields: [companyId], references: [id])
+  companyId String?
 
   movementItems MovementItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Movement {
-  id         String         @id @default(cuid())
-  type       MovementType
-  reference  String?
-  note       String?
-  status     MovementStatus @default(CONFIRMED)
-  created_at DateTime       @default(now())
+  id           String         @id @default(cuid())
+  type         MovementType
+  reference    String?
+  note         String?
+  status       MovementStatus @default(CONFIRMED)
+  // Montant total figé au moment du mouvement (évite les incohérences si les prix changent)
+  total_amount Float?
+  created_at   DateTime       @default(now())
 
-  supplier   Suppliers? @relation(fields: [supplierId], references: [id])
+  supplier   Supplier? @relation(fields: [supplierId], references: [id])
   supplierId String?
 
   client   Client? @relation(fields: [clientId], references: [id])
@@ -113,13 +152,17 @@ model Movement {
   created_by  User   @relation(fields: [createdById], references: [id])
   createdById String
 
+  company   Company? @relation(fields: [companyId], references: [id])
+  companyId String?
+
   items MovementItem[]
 }
 
 model MovementItem {
   id         String @id @default(cuid())
-  unit       Int
-  unit_price Float?
+  // Quantité déplacée (entrée, sortie, retour...)
+  quantity   Int
+  unit_price Float
 
   movement   Movement @relation(fields: [movementId], references: [id])
   movementId String
@@ -132,12 +175,14 @@ model Client {
   id               String  @id @default(cuid())
   name             String
   phone            String  @unique
+  // Matricule fiscale tunisien (chaîne alphanumérique, ex: "0123456A/P/M000")
   matriculeFiscale String  @unique
-  codeTva          Float?
+  // Code TVA : chaîne alphanumérique (pas un Float)
+  codeTva          String?
   is_active        Boolean @default(true)
 
   movements Movement[]
 
-  user   User?   @relation(fields: [userId], references: [id])
-  userId String?
+  company   Company? @relation(fields: [companyId], references: [id])
+  companyId String?
 }

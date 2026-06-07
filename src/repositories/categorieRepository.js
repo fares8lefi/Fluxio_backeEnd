@@ -1,44 +1,45 @@
 const prisma = require('../../config/db');
 
-// Récupère toutes les catégories
-const getAll = async () => {
-    return await prisma.categorie.findMany();
+// Récupère toutes les catégories de la compagnie
+const getAll = async (companyId) => {
+    return  prisma.category.findMany({ where: { companyId } });
 };
 
-// Récupère une catégorie par ID
-const getById = async (id) => {
-    return await prisma.categorie.findUnique({
-        where: { id: id },
+// Récupère une catégorie par ID (vérifie l'appartenance à la compagnie)
+const getById = async (id, companyId) => {
+    return  prisma.category.findFirst({
+        where: { id, companyId },
     });
 };
 
 // Crée une nouvelle catégorie
 const create = async (data) => {
-    return await prisma.categorie.create({ data });
+    return  prisma.category.create({ data });
 };
 
 // Met à jour une catégorie par ID
 const update = async (id, updates) => {
-    return await prisma.categorie.update({
-        where: { id: id },
+    return  prisma.category.update({
+        where: { id },
         data: updates,
     });
 };
 
 // Supprime une catégorie par ID
 const deleteById = async (id) => {
-    return await prisma.categorie.delete({
-        where: { id: id },
+    return  prisma.category.delete({
+        where: { id },
     });
 };
 
-// Vérifie si une catégorie existe déjà avec le même nom ou code
-const existsWithCodeOrName = async (code, name) => {
-    const existing = await prisma.categorie.findFirst({
+// Vérifie si une catégorie avec le même nom ou code existe déjà dans la compagnie
+const existsWithCodeOrName = async (code, name, companyId) => {
+    const existing = await prisma.category.findFirst({
         where: {
+            companyId,
             OR: [
                 { code: parseInt(code) },
-                { name: name },
+                { name },
             ],
         },
     });

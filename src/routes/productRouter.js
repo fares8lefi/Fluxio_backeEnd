@@ -1,5 +1,5 @@
-var express = require('express');
-var router = express.Router();
+const  express = require('express');
+const  router = express.Router();
 const productController = require('../controllers/productController')
 const { requireAuthUser } = require('../middlewares/authMiddelwares');
 
@@ -19,4 +19,6 @@ router.get('/getProductByFiltres',requireAuthUser, productController.getProductB
 router.get('/getProductsBySupplier',requireAuthUser, productController.getSuppliersByProduct);
 router.get('/getProductsByCategories',requireAuthUser, productController.getProductsByCategories);
 router.get('/getSumProductByCategorie',requireAuthUser, productController.getSumProductByCategorie);
-module.exports = router;
+router.get('/getProductsBelowStockMin',requireAuthUser, productController.getProductsBelowStockMin);
+
+module.exports = router;

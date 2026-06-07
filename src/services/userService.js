@@ -1,5 +1,6 @@
 // Logique métier des utilisateurs — toutes les opérations Mongoose remplacées par le repository Prisma.
 const userRepository = require('../repositories/userRepository');
+const companyRepository = require('../repositories/companyRepository');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { sendEmailVerificationCode, sendEmailResetCode } = require('./SendEmail');
@@ -20,11 +21,15 @@ const createUser = async (data) => {
         throw error;
     }
 
-    const { username, password, phone, email } = data;
+    const { username, password, phone, email, company_name } = data;
     const code = Math.floor(1000 + Math.random() * 9000);
+    // Le code OTP expire dans 10 minutes
+    const code_expires_at = new Date(Date.now() + 10 * 60 * 1000);
+
+    const company = await companyRepository.create({ name: company_name });
 
     await Promise.all([
-        userRepository.create({ username, email, password, phone, code, is_active: false }),
+        userRepository.create({ username, email, password, phone, code, code_expires_at, is_active: false, companyId: company.id }),
         sendEmailVerificationCode(email, username, code),
     ]);
 };
@@ -44,7 +49,14 @@ const verifyAccounts = async (email, code) => {
         throw error;
     }
 
-    await userRepository.update(user.id, { is_active: true, code: null });
+    // Vérifier que le code OTP n'a pas expiré
+    if (user.code_expires_at && new Date() > new Date(user.code_expires_at)) {
+        const error = new Error('Code expiré. Veuillez en demander un nouveau.');
+        error.statusCode = 400;
+        throw error;
+    }
+
+    await userRepository.update(user.id, { is_active: true, code: null, code_expires_at: null });
 };
 
 const resendCode = async (email) => {
@@ -56,7 +68,8 @@ const resendCode = async (email) => {
     }
 
     const code = Math.floor(1000 + Math.random() * 9000);
-    await userRepository.update(user.id, { code });
+    const code_expires_at = new Date(Date.now() + 10 * 60 * 1000);
+    await userRepository.update(user.id, { code, code_expires_at });
 
     await sendEmailVerificationCode(email, user.username, code);
 };
@@ -78,7 +91,8 @@ const forgetPasswordVerifyCode = async (email, newPassword) => {
     }
 
     const code = Math.floor(1000 + Math.random() * 9000);
-    await userRepository.update(user.id, { code });
+    const code_expires_at = new Date(Date.now() + 10 * 60 * 1000);
+    await userRepository.update(user.id, { code, code_expires_at });
 
     await sendEmailResetCode(email, user.username, code);
 

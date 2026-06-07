@@ -14,13 +14,14 @@ const clientRegistrationSchema = z.object({
         .min(1, 'Le numéro de téléphone est obligatoire'),
 
     matriculeFiscale: z
-        .string()
+        .string({ required_error: 'Le matricule fiscale est obligatoire' })
         .trim()
-        .optional()
-        .nullable(),
+        .min(1, 'Le matricule fiscale est obligatoire'),
 
+    // Correction : codeTva est une chaîne alphanumérique (ex: "0123456A/P/M000"), pas un Float
     codeTva: z
-        .number({ invalid_type_error: 'Le code TVA doit être un nombre' })
+        .string({ invalid_type_error: 'Le code TVA doit être une chaîne de caractères' })
+        .trim()
         .optional()
         .nullable(),
 });
@@ -41,13 +42,18 @@ const clientUpdateSchema = z.object({
     matriculeFiscale: z
         .string()
         .trim()
+        .min(1, 'Le matricule fiscale ne peut pas être vide')
         .optional()
         .nullable(),
 
+    // Correction : codeTva est une chaîne, pas un Float
     codeTva: z
-        .number({ invalid_type_error: 'Le code TVA doit être un nombre' })
+        .string()
+        .trim()
         .optional()
         .nullable(),
+
+    is_active: z.boolean().optional(),
 });
 
 // ─── Helper ──────────────────────────────────────────────────────────────────
@@ -75,16 +81,12 @@ const formatResult = (result) => {
 
 /**
  * Valide les données de création d'un client.
- * @param {Object} data
- * @returns {{ errors: Object, isValid: boolean }}
  */
 const validateClientRegistration = (data) =>
     formatResult(clientRegistrationSchema.safeParse(data));
 
 /**
  * Valide les données de mise à jour d'un client.
- * @param {Object} data
- * @returns {{ errors: Object, isValid: boolean }}
  */
 const validateClientUpdate = (data) =>
     formatResult(clientUpdateSchema.safeParse(data));

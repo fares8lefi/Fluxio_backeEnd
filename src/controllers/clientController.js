@@ -1,11 +1,10 @@
 const clientService = require('../services/clientService');
 
-
-
+// POST /api/clients/createClient
 module.exports.createClient = async (req, res) => {
     try {
-
-        const client = await clientService.createClient(req.body);
+        const companyId = (req.user || req.session?.user)?.companyId;
+        const client = await clientService.createClient(req.body, companyId);
         return res.status(201).json({ success: true, client });
     } catch (error) {
         const statusCode = error.statusCode || 500;
@@ -17,79 +16,87 @@ module.exports.createClient = async (req, res) => {
     }
 };
 
-module.exports.updateClient= async (req, res) => {
-    try{
+// PUT /api/clients/updateClient/:id
+module.exports.updateClient = async (req, res) => {
+    try {
         const id = req.params.id;
-        const update = await clientService.updateClient(id,req.body);
-        return res.status(201).json({ success: true, update });
-
-    }catch(error){
+        const companyId = (req.user || req.session?.user)?.companyId;
+        const client = await clientService.updateClient(id, req.body, companyId);
+        // Correction : 200 pour un update (pas 201)
+        return res.status(200).json({ success: true, client });
+    } catch (error) {
         const statusCode = error.statusCode || 500;
         return res.status(statusCode).json({
             success: false,
             message: error.message,
             ...(error.details && { details: error.details }),
         });
-
     }
-}
+};
 
+// DELETE /api/clients/deleteClient/:id
 module.exports.deleteClient = async (req, res) => {
     try {
         const id = req.params.id;
-        await clientService.deleteClient(id);
-        res.status(204).json({success: true, message: 'Client deleted successfully.'});
-
-    }catch(error){
+        const companyId = (req.user || req.session?.user)?.companyId;
+        await clientService.deleteClient(id, companyId);
+        // Correction : 200 avec body (204 n'envoie pas de corps de réponse)
+        return res.status(200).json({ success: true, message: 'Client supprimé avec succès' });
+    } catch (error) {
         const statusCode = error.statusCode || 500;
         return res.status(statusCode).json({
             success: false,
             message: error.message,
             ...(error.details && { details: error.details }),
-        })
+        });
     }
-}
+};
 
-module.exports.getAllClients = async (_req, res) => {
-    try{
-        const clients = await clientService.getAllClients()
-        res.status(200).json({success: true, clients});
-    }catch(error){
+// GET /api/clients/getAllClients
+// Correction : `_req` remplacé par `req` pour accéder à req.user
+module.exports.getAllClients = async (req, res) => {
+    try {
+        const companyId = (req.user || req.session?.user)?.companyId;
+        const clients = await clientService.getAllClients(companyId);
+        return res.status(200).json({ success: true, clients });
+    } catch (error) {
         const statusCode = error.statusCode || 500;
         return res.status(statusCode).json({
             success: false,
             message: error.message,
             ...(error.details && { details: error.details }),
-        })
+        });
     }
-}
+};
 
-module.exports.getClientByMatriculeFiscale= async (req, res) => {
-   try{
-       console.log(req.params.mf);
-       const client = await clientService.getClientByMatriculeFiscale(req.params.mf);
-       return res.status(200).json({success: true, client});
+// GET /api/clients/getClientByMatriculeFiscale/:mf
+module.exports.getClientByMatriculeFiscale = async (req, res) => {
+    try {
+        const companyId = (req.user || req.session?.user)?.companyId;
+        const client = await clientService.getClientByMatriculeFiscale(req.params.mf, companyId);
+        return res.status(200).json({ success: true, client });
+    } catch (error) {
+        const statusCode = error.statusCode || 500;
+        return res.status(statusCode).json({
+            success: false,
+            message: error.message,
+            ...(error.details && { details: error.details }),
+        });
+    }
+};
 
-   }catch(error){
-       const statusCode = error.statusCode || 500;
-       return res.status(statusCode).json({
-           success: false,
-           message: error.message,
-           ...(error.details && { details: error.details }),
-       })
-   }
-}
-
+// GET /api/clients/searchClientsByName?name=...
 module.exports.searchClientsByName = async (req, res) => {
     try {
-        const clients = await clientService.searchClientsByName(req.query.name);
-        res.status(200).json({success: true, clients});
-    }catch (error) {
+        const companyId = (req.user || req.session?.user)?.companyId;
+        const clients = await clientService.searchClientsByName(req.query.name, companyId);
+        return res.status(200).json({ success: true, clients });
+    } catch (error) {
         const statusCode = error.statusCode || 500;
         return res.status(statusCode).json({
             success: false,
             message: error.message,
             ...(error.details && { details: error.details }),
-        })
+        });
     }
-}
+};

@@ -2,17 +2,24 @@ const { z } = require('zod');
 
 // ─── Sub-schemas ─────────────────────────────────────────────────────────────
 
-/** Regex simple pour valider un MongoID (24 hex chars) */
-const mongoIdRegex = /^[a-f\d]{24}$/i;
+/**
+ * Regex pour valider un CUID (format Prisma par défaut).
+ * Un CUID commence par 'c' suivi de caractères alphanumériques.
+ * On accepte aussi les UUIDs pour flexibilité.
+ */
+const cuidRegex = /^[a-z0-9]{20,30}$/i;
 
 const mouvmentItemSchema = z.object({
-    product: z
-        .string({ required_error: 'Le produit est requis' })
+    productId: z
+        .string({ required_error: 'Le produit (productId) est requis' })
         .trim()
-        .regex(mongoIdRegex, 'Le produit doit être un MongoID valide'),
+        .min(1, 'Le produit (productId) est requis'),
 
-    unit: z
-        .number({ required_error: 'La quantité est requise', invalid_type_error: 'La quantité doit être un nombre entier' })
+    quantity: z
+        .number({
+            required_error: 'La quantité est requise',
+            invalid_type_error: 'La quantité doit être un nombre entier',
+        })
         .int('La quantité doit être un nombre entier')
         .min(1, 'La quantité doit être au minimum 1'),
 
@@ -39,15 +46,22 @@ const mouvmentRegistrationSchema = z.object({
         .array(mouvmentItemSchema, { required_error: 'Au moins un article est requis' })
         .min(1, 'Au moins un article est requis'),
 
-    created_by: z
-        .string({ required_error: "L'ID de l'utilisateur créateur est requis (created_by)" })
+    createdById: z
+        .string({ required_error: "L'ID de l'utilisateur créateur est requis" })
         .trim()
-        .regex(mongoIdRegex, "L'ID du créateur est invalide"),
+        .min(1, "L'ID du créateur est requis"),
 
-    supplier: z
+    supplierId: z
         .string()
         .trim()
-        .regex(mongoIdRegex, "L'ID du fournisseur est invalide")
+        .min(1, "L'ID du fournisseur est invalide")
+        .optional()
+        .nullable(),
+
+    clientId: z
+        .string()
+        .trim()
+        .min(1, "L'ID du client est invalide")
         .optional()
         .nullable(),
 
@@ -82,10 +96,10 @@ const mouvmentUpdateSchema = z.object({
         .min(1, 'Au moins un article est requis si les articles sont modifiés')
         .optional(),
 
-    supplier: z
+    supplierId: z
         .string()
         .trim()
-        .regex(mongoIdRegex, "L'ID du fournisseur est invalide")
+        .min(1, "L'ID du fournisseur est invalide")
         .optional()
         .nullable(),
 
@@ -117,7 +131,6 @@ const formatResult = (result) => {
     }
     const errors = {};
     result.error.issues.forEach(({ path, message }) => {
-        // path peut être ['items', 0, 'product'] → on remonte au premier segment
         const key = path[0];
         if (key !== undefined && !errors[key]) {
             errors[key] = message;
@@ -147,7 +160,6 @@ const validateMouvmentUpdate = (data) =>
 module.exports = {
     validateMouvmentRegistration,
     validateMouvmentUpdate,
-    // Expose schemas for reuse / testing
     mouvmentRegistrationSchema,
     mouvmentUpdateSchema,
     mouvmentItemSchema,

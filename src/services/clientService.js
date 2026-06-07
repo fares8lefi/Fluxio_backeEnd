@@ -1,89 +1,104 @@
 const clientRepository = require("../repositories/clientRepository");
-const {validateClientRegistration ,validateClientUpdate } = require('../validations/ClientValidations')
+const { validateClientRegistration, validateClientUpdate } = require('../validations/ClientValidations');
 
-
-const createClient = async (client) => {
+// Crée un client
+const createClient = async (client, companyId) => {
     const validationResult = await validateClientRegistration(client);
-    if (!validationResult) {
-        const error = new Error('Validation échouée');
+    // Correction du bug : était `if (!validationResult)` — doit tester `.isValid`
+    if (!validationResult.isValid) {
+        const error = new Error('Données client invalides');
         error.statusCode = 400;
         error.details = validationResult.errors;
         throw error;
+    }
+    return clientRepository.addClient({ ...client, companyId });
+};
 
-    }
-     return clientRepository.addClient(client);
-}
-const updateClient = async (id, data) => {
-    const validationResult =  await validateClientUpdate(data)
-    const client = await clientRepository.getClinetByID(id);
+// Met à jour un client
+const updateClient = async (id, data, companyId) => {
+    const client = await clientRepository.getClientByID(id, companyId);
     if (!client) {
-        const error = new Error('client not  found ');
-        error.statusCode = 401;
-        throw error;
-    }
-     else if (!validationResult) {
-        const error = new Error('client data is not valid');
-        error.statusCode = 401;
-        error.details = validationResult.errors
+        const error = new Error('Client introuvable');
+        error.statusCode = 404;
         throw error;
     }
 
-    return  await clientRepository.updateClient(id, data);
-}
+    const validationResult = await validateClientUpdate(data);
+    if (!validationResult.isValid) {
+        const error = new Error('Données client invalides');
+        error.statusCode = 400;
+        error.details = validationResult.errors;
+        throw error;
+    }
 
-const deleteClient = async (id) => {
-    const client = await clientRepository.getClinetByID(id);
+    return await clientRepository.updateClient(id, data);
+};
+
+// Supprime un client
+const deleteClient = async (id, companyId) => {
+    const client = await clientRepository.getClientByID(id, companyId);
     if (!client) {
-        const error = new Error('client not  found ');
-        error.statusCode = 401;
+        const error = new Error('Client introuvable');
+        error.statusCode = 404;
         throw error;
     }
     return await clientRepository.deleteClient(id);
-}
-const getClientByMatriculeFiscale = async (mf) => {
-    if(!mf){
-        const error = new Error('matrucuile fiscule should be not bll ');
-        error.statusCode = 401;
-        throw error;
-    }
-    const client = await clientRepository.getClientByMatriculeFiscale(mf);
-    if(!client) {
-        const error = new Error('client not  found ');
-        error.statusCode = 401;
-        throw error;
-    }
-    return client;
-}
+};
 
-const getClientByID = async (id) => {
-    const client = await clientRepository.getClientByMatriculeFiscale(id);
-    if(!client) {
-        const error = new Error('client not  found ');
+// Recherche un client par matricule fiscale
+const getClientByMatriculeFiscale = async (mf, companyId) => {
+    if (!mf) {
+        const error = new Error('Le matricule fiscale est obligatoire');
         error.statusCode = 400;
         throw error;
     }
+    const client = await clientRepository.getClientByMatriculeFiscale(mf, companyId);
+    if (!client) {
+        const error = new Error('Client introuvable');
+        error.statusCode = 404;
+        throw error;
+    }
     return client;
+};
 
-}
-const getAllClients = async () => {
-    const clients = await clientRepository.getAllClients();
-    if(!clients) {
-        const error = new Error('client is required ');
-        error.statusCode = 400;
+// Récupère un client par ID
+const getClientByID = async (id, companyId) => {
+    const client = await clientRepository.getClientByID(id, companyId);
+    if (!client) {
+        const error = new Error('Client introuvable');
+        error.statusCode = 404;
+        throw error;
+    }
+    return client;
+};
+
+// Récupère tous les clients de la compagnie
+const getAllClients = async (companyId) => {
+    const clients = await clientRepository.getAllClients(companyId);
+    if (!clients || clients.length === 0) {
+        const error = new Error('Aucun client trouvé');
+        error.statusCode = 404;
         throw error;
     }
     return clients;
-}
+};
 
-const searchClientsByName = async (name) => {
-    if(!name) {
-       const error = new Error('name is required');
-       error.statusCode = 400;
-       throw error;
+// Recherche des clients par nom
+const searchClientsByName = async (name, companyId) => {
+    if (!name) {
+        const error = new Error('Le paramètre name est requis');
+        error.statusCode = 400;
+        throw error;
     }
-   return  clientRepository.searchClientsByName(name);
+    const clients = await clientRepository.searchClientsByName(name, companyId);
+    if (!clients || clients.length === 0) {
+        const error = new Error('Aucun client trouvé avec ce nom');
+        error.statusCode = 404;
+        throw error;
+    }
+    return clients;
+};
 
-}
 module.exports = {
     createClient,
     updateClient,
@@ -92,4 +107,4 @@ module.exports = {
     getClientByID,
     getAllClients,
     searchClientsByName,
-}
+};

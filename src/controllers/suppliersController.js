@@ -1,11 +1,12 @@
-// Contrôleur fournisseurs : gestion HTTP uniquement — tout accès direct au modèle supprimé, logique déléguée au supplierService.
+// Contrôleur fournisseurs : gestion HTTP uniquement — logique déléguée au supplierService.
 const supplierService = require('../services/supplierService');
 
 // POST /api/suppliers/addSuppliers
 module.exports.addSuppliers = async function (req, res) {
     try {
-        const supplier = await supplierService.addSupplier(req.body);
-        return res.status(201).json({ success: true, suppliers: supplier });
+        const companyId = (req.user || req.session?.user)?.companyId;
+        const supplier = await supplierService.addSupplier(req.body, companyId);
+        return res.status(201).json({ success: true, supplier });
     } catch (error) {
         const statusCode = error.statusCode || 500;
         return res.status(statusCode).json({
@@ -19,7 +20,8 @@ module.exports.addSuppliers = async function (req, res) {
 // PUT /api/suppliers/updateSuppliers/:id
 module.exports.updateSuppliers = async function (req, res) {
     try {
-        const supplier = await supplierService.updateSupplier(req.params.id, req.body);
+        const companyId = (req.user || req.session?.user)?.companyId;
+        const supplier = await supplierService.updateSupplier(req.params.id, req.body, companyId);
         return res.status(200).json({ success: true, supplier });
     } catch (error) {
         const statusCode = error.statusCode || 500;
@@ -34,7 +36,8 @@ module.exports.updateSuppliers = async function (req, res) {
 // DELETE /api/suppliers/deleteSuppliers/:id
 module.exports.deleteSuppliers = async function (req, res) {
     try {
-        await supplierService.deleteSupplier(req.params.id);
+        const companyId = (req.user || req.session?.user)?.companyId;
+        await supplierService.deleteSupplier(req.params.id, companyId);
         return res.status(200).json({ success: true, message: 'Fournisseur supprimé avec succès' });
     } catch (error) {
         const statusCode = error.statusCode || 500;
@@ -43,9 +46,11 @@ module.exports.deleteSuppliers = async function (req, res) {
 };
 
 // GET /api/suppliers/getActiveSuppliers
-module.exports.getActiveSuppliers = async function (_req, res) {
+// Correction : `_req` remplacé par `req` pour accéder à req.user
+module.exports.getActiveSuppliers = async function (req, res) {
     try {
-        const suppliers = await supplierService.getActiveSuppliers();
+        const companyId = (req.user || req.session?.user)?.companyId;
+        const suppliers = await supplierService.getActiveSuppliers(companyId);
         if (suppliers.length === 0) {
             return res.status(404).json({ success: false, message: 'Aucun fournisseur actif trouvé' });
         }
@@ -59,7 +64,8 @@ module.exports.getActiveSuppliers = async function (_req, res) {
 // PATCH /api/suppliers/updateSuppliersStatus/:id
 module.exports.updateSuppliersStatus = async function (req, res) {
     try {
-        await supplierService.deactivateSupplier(req.params.id);
+        const companyId = (req.user || req.session?.user)?.companyId;
+        await supplierService.deactivateSupplier(req.params.id, companyId);
         return res.status(200).json({ success: true, message: 'Fournisseur désactivé avec succès' });
     } catch (error) {
         const statusCode = error.statusCode || 500;
@@ -70,7 +76,8 @@ module.exports.updateSuppliersStatus = async function (req, res) {
 // GET /api/suppliers/searchSuppliersByName?name=...
 module.exports.searchSuppliersByName = async function (req, res) {
     try {
-        const suppliers = await supplierService.searchSuppliersByName(req.query.name);
+        const companyId = (req.user || req.session?.user)?.companyId;
+        const suppliers = await supplierService.searchSuppliersByName(req.query.name, companyId);
         if (suppliers.length === 0) {
             return res.status(404).json({ success: false, message: 'Aucun fournisseur trouvé avec ce nom' });
         }
@@ -82,9 +89,11 @@ module.exports.searchSuppliersByName = async function (req, res) {
 };
 
 // GET /api/suppliers/getAllSuppliers
-module.exports.getAllSuppliers = async function (_req, res) {
+// Correction : `_req` remplacé par `req` pour accéder à req.user
+module.exports.getAllSuppliers = async function (req, res) {
     try {
-        const suppliers = await supplierService.getAllSuppliers();
+        const companyId = (req.user || req.session?.user)?.companyId;
+        const suppliers = await supplierService.getAllSuppliers(companyId);
         if (suppliers.length === 0) {
             return res.status(404).json({ success: false, message: 'Aucun fournisseur trouvé' });
         }

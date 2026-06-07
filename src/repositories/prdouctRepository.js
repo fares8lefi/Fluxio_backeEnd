@@ -4,7 +4,7 @@ const prisma = require('../../config/db');
 // Crée un produit
 const addProduct = async (data) => {
     const { categorieId, supplierId, ...rest } = data;
-    return await prisma.product.create({
+    return  prisma.product.create({
         data: {
             ...rest,
             supplier:  supplierId  ? { connect: { id: supplierId } }  : undefined,
@@ -17,7 +17,7 @@ const addProduct = async (data) => {
 // Met à jour un produit
 const updateProduct = async (data, id) => {
     const { categorieId, supplierId, ...rest } = data;
-    return await prisma.product.update({
+    return  prisma.product.update({
         where: { id: id },
         data: {
             ...rest,
@@ -34,14 +34,14 @@ const updateProduct = async (data, id) => {
 
 // Récupère tous les produits (sans pagination)
 const getAllProduct = async () => {
-    return await prisma.product.findMany({
+    return  prisma.product.findMany({
         include: { supplier: true, categorie: true },
     });
 };
 
 // Récupère les produits avec pagination + relations
 const findPaginated = async (page, limit) => {
-    return await prisma.product.findMany({
+    return  prisma.product.findMany({
         skip: (page - 1) * limit,
         take: limit,
         include: { supplier: true, categorie: true },
@@ -50,12 +50,12 @@ const findPaginated = async (page, limit) => {
 
 // Compte le total des produits
 const countAll = async () => {
-    return await prisma.product.count();
+    return  prisma.product.count();
 };
 
 // Récupère un produit par ID (champs limités + relations)
 const getProductById = async (id) => {
-    return await prisma.product.findUnique({
+    return  prisma.product.findUnique({
         where: { id: id },
         select: {
             id: true, code: true, name: true, unit: true,
@@ -68,14 +68,14 @@ const getProductById = async (id) => {
 
 // Supprime un produit
 const deleteProduct = async (id) => {
-    return await prisma.product.delete({
+    return  prisma.product.delete({
         where: { id: id },
     });
 };
 
 // Recherche par filtres dynamiques
 const getProductByFiltres = async (filter) => {
-    return await prisma.product.findMany({
+    return  prisma.product.findMany({
         where: filter,
         include: { supplier: true, categorie: true },
     });

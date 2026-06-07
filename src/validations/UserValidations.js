@@ -24,6 +24,11 @@ const userRegistrationSchema = z.object({
         .trim()
         .min(1, 'Phone number is required')
         .regex(/^\+?[0-9\s\-().]{6,20}$/, 'Phone number is invalid'),
+
+    company_name: z
+        .string({ required_error: 'Company name is required' })
+        .trim()
+        .min(1, 'Company name is required'),
 });
 
 const userUpdateSchema = z.object({

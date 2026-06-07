@@ -5,15 +5,13 @@ const { z } = require('zod');
 const productRegistrationSchema = z.object({
     code: z
         .union([z.string(), z.number()])
-        .transform((v) => String(v).trim())
-        .refine((v) => v.length > 0, { message: 'Le code est requis' })
-        .refine((v) => /^\d+$/.test(v), { message: 'Le code doit être un nombre entier' }),
+        .transform((v) => parseInt(String(v).trim()))
+        .refine((v) => !isNaN(v) && v > 0, { message: 'Le code doit être un entier positif' }),
 
     barcode: z
         .union([z.string(), z.number()])
-        .transform((v) => String(v).trim())
-        .refine((v) => v.length > 0, { message: 'Le code-barres est requis' })
-        .refine((v) => /^\d+$/.test(v), { message: 'Le code-barres doit être un nombre entier' }),
+        .transform((v) => parseInt(String(v).trim()))
+        .refine((v) => !isNaN(v) && v > 0, { message: 'Le code-barres doit être un entier positif' }),
 
     name: z
         .string({ required_error: 'Le nom est requis' })
@@ -28,30 +26,55 @@ const productRegistrationSchema = z.object({
         .number({ required_error: 'Le prix de vente est requis', invalid_type_error: 'Le prix de vente doit être un nombre positif' })
         .min(0, 'Le prix de vente doit être un nombre positif'),
 
-    unit: z
-        .number({ required_error: "L'unité/quantité est requise", invalid_type_error: "L'unité doit être un nombre entier positif" })
-        .int("L'unité doit être un nombre entier positif")
-        .min(0, "L'unité doit être un nombre entier positif"),
+    // Renommé : unit → stock_quantity (quantité initiale en stock)
+    stock_quantity: z
+        .number({ invalid_type_error: 'La quantité en stock doit être un nombre entier positif' })
+        .int('La quantité en stock doit être un nombre entier')
+        .min(0, 'La quantité en stock doit être un nombre entier positif')
+        .optional()
+        .default(0),
 
     stock_min: z
         .number({ required_error: 'Le stock minimum est requis', invalid_type_error: 'Le stock minimum doit être un nombre entier positif' })
         .int('Le stock minimum doit être un nombre entier positif')
         .min(0, 'Le stock minimum doit être un nombre entier positif'),
+
+    stock_max: z
+        .number({ invalid_type_error: 'Le stock maximum doit être un nombre entier positif' })
+        .int('Le stock maximum doit être un nombre entier')
+        .min(0, 'Le stock maximum doit être un nombre entier positif')
+        .optional()
+        .nullable(),
+
+    // TVA tunisienne : 0, 7, 13, ou 19%
+    tva_rate: z
+        .number({ invalid_type_error: 'Le taux TVA doit être un nombre' })
+        .refine((v) => [0, 7, 13, 19].includes(v), { message: 'Taux TVA invalide. Valeurs acceptées : 0, 7, 13, 19' })
+        .optional()
+        .default(19),
+
+    unit_of_measure: z
+        .string()
+        .trim()
+        .min(1, "L'unité de mesure ne peut pas être vide")
+        .optional()
+        .default('pièce'),
+
+    supplierId: z.string().trim().optional().nullable(),
+    categoryId: z.string().trim().optional().nullable(),
 });
 
 const productUpdateSchema = z.object({
     code: z
         .union([z.string(), z.number()])
-        .transform((v) => String(v).trim())
-        .refine((v) => v.length > 0, { message: 'Le code ne peut pas être vide' })
-        .refine((v) => /^\d+$/.test(v), { message: 'Le code doit être un nombre entier' })
+        .transform((v) => parseInt(String(v).trim()))
+        .refine((v) => !isNaN(v) && v > 0, { message: 'Le code doit être un entier positif' })
         .optional(),
 
     barcode: z
         .union([z.string(), z.number()])
-        .transform((v) => String(v).trim())
-        .refine((v) => v.length > 0, { message: 'Le code-barres ne peut pas être vide' })
-        .refine((v) => /^\d+$/.test(v), { message: 'Le code-barres doit être un nombre entier' })
+        .transform((v) => parseInt(String(v).trim()))
+        .refine((v) => !isNaN(v) && v > 0, { message: 'Le code-barres doit être un entier positif' })
         .optional(),
 
     name: z
@@ -70,10 +93,10 @@ const productUpdateSchema = z.object({
         .min(0, 'Le prix de vente doit être un nombre positif')
         .optional(),
 
-    unit: z
-        .number({ invalid_type_error: "L'unité doit être un nombre entier positif" })
-        .int("L'unité doit être un nombre entier positif")
-        .min(0, "L'unité doit être un nombre entier positif")
+    stock_quantity: z
+        .number({ invalid_type_error: 'La quantité en stock doit être un nombre entier' })
+        .int('La quantité en stock doit être un nombre entier')
+        .min(0, 'La quantité en stock doit être un nombre entier positif')
         .optional(),
 
     stock_min: z
@@ -81,6 +104,22 @@ const productUpdateSchema = z.object({
         .int('Le stock minimum doit être un nombre entier positif')
         .min(0, 'Le stock minimum doit être un nombre entier positif')
         .optional(),
+
+    stock_max: z
+        .number({ invalid_type_error: 'Le stock maximum doit être un nombre entier positif' })
+        .int('Le stock maximum doit être un nombre entier')
+        .min(0, 'Le stock maximum doit être un nombre entier positif')
+        .optional()
+        .nullable(),
+
+    tva_rate: z
+        .number()
+        .refine((v) => [0, 7, 13, 19].includes(v), { message: 'Taux TVA invalide. Valeurs acceptées : 0, 7, 13, 19' })
+        .optional(),
+
+    unit_of_measure: z.string().trim().min(1).optional(),
+    supplierId:      z.string().trim().optional().nullable(),
+    categoryId:      z.string().trim().optional().nullable(),
 });
 
 const productSearchSchema = z.object({
@@ -90,12 +129,12 @@ const productSearchSchema = z.object({
         .min(1, 'Le nom ne peut pas être vide')
         .optional(),
 
-    // z.coerce.number() is required because req.query values are always strings
-    unit: z
+    // Renommé : unit → stock_quantity
+    stock_quantity: z
         .coerce
-        .number({ invalid_type_error: "L'unité doit être un nombre entier" })
-        .int("L'unité doit être un nombre entier")
-        .min(0, "L'unité doit être un nombre entier positif")
+        .number({ invalid_type_error: 'La quantité doit être un nombre entier' })
+        .int('La quantité doit être un nombre entier')
+        .min(0, 'La quantité doit être un nombre entier positif')
         .optional(),
 
     maxPrice: z
@@ -114,13 +153,13 @@ const productSearchSchema = z.object({
 // ─── Helper ──────────────────────────────────────────────────────────────────
 
 /**
- * Parse a Zod result into the legacy { errors, isValid } format.
+ * Parse a Zod result into the legacy { errors, isValid, data } format.
  * @param {import('zod').SafeParseReturnType} result
- * @returns {{ errors: Object, isValid: boolean }}
+ * @returns {{ errors: Object, isValid: boolean, data: any }}
  */
 const formatResult = (result) => {
     if (result.success) {
-        return { errors: {}, isValid: true, data: result.data }; // expose parsed/coerced data
+        return { errors: {}, isValid: true, data: result.data };
     }
     const errors = {};
     result.error.issues.forEach(({ path, message }) => {
@@ -134,27 +173,12 @@ const formatResult = (result) => {
 
 // ─── Exported validators ─────────────────────────────────────────────────────
 
-/**
- * Valide les données de création d'un produit.
- * @param {Object} data
- * @returns {{ errors: Object, isValid: boolean }}
- */
 const validateProductRegistration = (data) =>
     formatResult(productRegistrationSchema.safeParse(data));
 
-/**
- * Valide les données de mise à jour d'un produit.
- * @param {Object} data
- * @returns {{ errors: Object, isValid: boolean }}
- */
 const validateProductUpdate = (data) =>
     formatResult(productUpdateSchema.safeParse(data));
 
-/**
- * Valide les critères de recherche d'un produit.
- * @param {Object} data
- * @returns {{ errors: Object, isValid: boolean }}
- */
 const validateProductSearch = (data) =>
     formatResult(productSearchSchema.safeParse(data));
 
@@ -162,7 +186,6 @@ module.exports = {
     validateProductRegistration,
     validateProductUpdate,
     validateProductSearch,
-    // Expose schemas for reuse / testing
     productRegistrationSchema,
     productUpdateSchema,
     productSearchSchema,

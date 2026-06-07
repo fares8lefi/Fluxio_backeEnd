@@ -4,34 +4,40 @@ const { z } = require('zod');
 
 const categorieRegistrationSchema = z.object({
     name: z
-        .string({ required_error: 'Name is required' })
+        .string({ required_error: 'Le nom de la catégorie est requis' })
         .trim()
-        .min(1, 'Name is required'),
+        .min(1, 'Le nom de la catégorie est requis'),
+
+    code: z
+        .union([z.string(), z.number()])
+        .transform((v) => parseInt(String(v).trim()))
+        .refine((v) => !isNaN(v) && v > 0, { message: 'Le code doit être un entier positif' }),
 
     description: z
-        .string({ required_error: 'Description is required' })
+        .string()
         .trim()
-        .min(1, 'Description is required'),
+        .optional()
+        .nullable(),
 });
 
 const categorieUpdateSchema = z.object({
     name: z
         .string()
         .trim()
-        .min(1, 'Name cannot be empty')
+        .min(1, 'Le nom ne peut pas être vide')
         .optional(),
 
     code: z
-        .string()
-        .trim()
-        .min(1, 'Code cannot be empty')
+        .union([z.string(), z.number()])
+        .transform((v) => parseInt(String(v).trim()))
+        .refine((v) => !isNaN(v) && v > 0, { message: 'Le code doit être un entier positif' })
         .optional(),
 
     description: z
         .string()
         .trim()
-        .min(1, 'Description cannot be empty')
-        .optional(),
+        .optional()
+        .nullable(),
 });
 
 // ─── Helper ──────────────────────────────────────────────────────────────────
@@ -59,16 +65,12 @@ const formatResult = (result) => {
 
 /**
  * Valide les données de création d'une catégorie.
- * @param {Object} data
- * @returns {{ errors: Object, isValid: boolean }}
  */
 const validateCategorieRegistration = (data) =>
     formatResult(categorieRegistrationSchema.safeParse(data));
 
 /**
  * Valide les données de mise à jour d'une catégorie.
- * @param {Object} data
- * @returns {{ errors: Object, isValid: boolean }}
  */
 const validateCategorieUpdate = (data) =>
     formatResult(categorieUpdateSchema.safeParse(data));
@@ -76,7 +78,6 @@ const validateCategorieUpdate = (data) =>
 module.exports = {
     validateCategorieRegistration,
     validateCategorieUpdate,
-    // Expose schemas for reuse / testing
     categorieRegistrationSchema,
     categorieUpdateSchema,
 };

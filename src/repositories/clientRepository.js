@@ -1,66 +1,49 @@
 const prisma = require('../../config/db');
 
-
+// Crée un client
 const addClient = async (data) => {
+    return prisma.client.create({ data });
+};
 
-    return  prisma.client.create({
-        data: data
+// Recherche un client par matricule fiscale dans la compagnie
+const getClientByMatriculeFiscale = async (matricule, companyId) => {
+    return prisma.client.findFirst({
+        where: { matriculeFiscale: matricule, companyId },
     });
-}
+};
 
-const getClientByMatriculeFiscale = async (matricule) => {
-    return   prisma.client.findUnique(
-        {
-            where:{
-                matriculeFiscale:matricule,
-            }
-        }
-    )
-}
+// Met à jour un client
+const updateClient = async (id, updates) => {
+    return prisma.client.update({
+        where: { id },
+        data: updates,
+    });
+};
 
-const updateClient = async (id,updates) => {
-    return  prisma.client.update({where :{
-        id: id,},
-        data : updates
-        })
-}
- const deleteClient = async (id) => {
-    return prisma.client.delete({
-        where :{
-            id:id,
-        }
-    })
- }
- const getClientByID = async (id) => {
-    return   prisma.client.findUnique({where:{id}})
- }
+// Supprime un client
+const deleteClient = async (id) => {
+    return prisma.client.delete({ where: { id } });
+};
 
- const getAllClients = async () => {
-    const clients = await   prisma.client.findMany()
-     if(clients.length ===0){
-         const error = new Error('client not found')
-         error.statusCode = 404
-         throw error
-     }
-     return clients
- }
-const searchClientsByName = async (name) => {
-    const clients = await prisma.client.findMany({
+// Récupère un client par ID (vérifie l'appartenance à la compagnie)
+const getClientByID = async (id, companyId) => {
+    return prisma.client.findFirst({ where: { id, companyId } });
+};
+
+// Récupère tous les clients de la compagnie
+const getAllClients = async (companyId) => {
+    return prisma.client.findMany({ where: { companyId } });
+};
+
+// Recherche des clients par nom (insensible à la casse)
+const searchClientsByName = async (name, companyId) => {
+    return prisma.client.findMany({
         where: {
-            name: {
-                contains: name,
-            }
-        }
-    })
-
-    if (clients.length === 0) {
-        const error = new Error('no clients found')
-        error.statusCode = 404
-        throw error
-    }
-
-    return clients
-}
+            companyId,
+            name: { contains: name },
+        },
+    });
+};
 
 module.exports = {
     addClient,
@@ -69,5 +52,5 @@ module.exports = {
     updateClient,
     deleteClient,
     getClientByID,
-    searchClientsByName
-}
+    searchClientsByName,
+};

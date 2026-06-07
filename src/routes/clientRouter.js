@@ -1,12 +1,14 @@
-var express = require('express');
-var router = express.Router();
-const clientController = require('../controllers/clientController')
-const {requireAuthUser}= require('../middlewares/authMiddelwares')
+const express = require('express');
+const router = express.Router();
+const clientController = require('../controllers/clientController');
+const { requireAuthUser } = require('../middlewares/authMiddelwares');
 
-router.post('/createClient',clientController.createClient)
-router.put('/updateClient/:id' ,clientController.updateClient)
-router.delete('/deleteClient/:id' ,clientController.deleteClient)
-router.get("/getAllClients",clientController.getAllClients)
-router.get('/getClientByMatriculeFiscale/:mf',clientController.getClientByMatriculeFiscale)
-router.get('/searchClientsByName',clientController.searchClientsByName)
+// Toutes les routes clients requièrent une authentification
+router.post('/createClient',                  requireAuthUser, clientController.createClient);
+router.put('/updateClient/:id',               requireAuthUser, clientController.updateClient);
+router.delete('/deleteClient/:id',            requireAuthUser, clientController.deleteClient);
+router.get('/getAllClients',                   requireAuthUser, clientController.getAllClients);
+router.get('/getClientByMatriculeFiscale/:mf',requireAuthUser, clientController.getClientByMatriculeFiscale);
+router.get('/searchClientsByName',            requireAuthUser, clientController.searchClientsByName);
+
 module.exports = router;

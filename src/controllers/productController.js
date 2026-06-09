@@ -151,12 +151,22 @@ module.exports.getSuppliersByProduct = async function (req, res) {
 };
 
 // GET /api/products/getProductsBelowStockMin
-module.exports.getProductsBelowStockMin = async function (req, res) {
+module.exports.getOutOfStockProducts = async function (req, res) {
     try {
         const companyId = (req.user || req.session?.user)?.companyId;
-        const products = await productService.getProductsBelowStockMin(companyId);
+        const products = await productService.getOutOfStockProducts(companyId);
         return res.status(200).json({ success: true, products });
     } catch (error) {
         return res.status(500).json({ success: false, message: error.message });
     }
 };
+
+module.exports.getLowStockDashboard = async function (req, res) {
+    try{
+        const companyId = (req.user || req.session?.user)?.companyId;
+        const products = await productService.getLowStockDashboard(companyId);
+        return res.status(200).json({ success: true, products });
+    }catch (error) {
+        return res.status(500).json({ success: false, message: error.message });
+    }
+}

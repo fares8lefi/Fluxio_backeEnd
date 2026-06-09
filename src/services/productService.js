@@ -191,6 +191,5 @@ module.exports = {
     getSuppliersByProduct,
     getProductsBelowStockMin,
     getOutOfStockProducts,
-    getOutOfStockProducts,
     getLowStockDashboard
 };

@@ -1,5 +1,6 @@
 // Couche d'accès aux données pour les produits — toutes les opérations Prisma (CRUD, pagination, agrégations).
 const prisma = require('../../config/db');
+const equals = require("validator/es/lib/equals");
 
 /**
  * Calcule price_ht et price_ttc à partir du prix d'achat et du taux TVA.
@@ -176,6 +177,22 @@ const getProductsBelowStockMin = async (companyId) => {
     });
 };
 
+const getOutOfStockProducts = async (companyId) => {
+    return prisma.product.findMany({
+        where: {
+            companyId,
+            stock_quantity: {
+                equals: 0
+            }
+        },
+        select: {
+            id: true,
+            name: true,
+            code: true,
+            stock_quantity: true
+        }
+    });
+};
 module.exports = {
     addProduct,
     updateProduct,
@@ -189,4 +206,5 @@ module.exports = {
     getSumProductByCategorie,
     getSuppliersByProduct,
     getProductsBelowStockMin,
+    getOutOfStockProducts
 };

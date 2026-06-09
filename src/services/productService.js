@@ -170,6 +170,12 @@ const getProductsBelowStockMin = async (companyId) => {
     return await productRepository.getProductsBelowStockMin(companyId);
 };
 
+const getOutOfStockProducts = async (companyId) => {
+    return await productRepository.getOutOfStockProducts(companyId);
+};
+
+
+
 module.exports = {
     addProduct,
     deleteProduct,
@@ -182,4 +188,5 @@ module.exports = {
     getSumProductByCategorie,
     getSuppliersByProduct,
     getProductsBelowStockMin,
+    getOutOfStockProducts,
 };

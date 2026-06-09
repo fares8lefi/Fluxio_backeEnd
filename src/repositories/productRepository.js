@@ -1,6 +1,6 @@
+// noinspection JSUnresolvedVariable,JSValidateTypes,JSCheckFunctionSignatures
 // Couche d'accès aux données pour les produits — toutes les opérations Prisma (CRUD, pagination, agrégations).
 const prisma = require('../../config/db');
-const equals = require("validator/es/lib/equals");
 
 /**
  * Calcule price_ht et price_ttc à partir du prix d'achat et du taux TVA.
@@ -136,7 +136,7 @@ const getSumProductByCategorie = async (companyId) => {
         _count: { id: true },
     });
 
-    const result = await Promise.all(
+    return Promise.all(
         groups.map(async (g) => {
             const cat = g.categoryId
                 ? await prisma.category.findUnique({ where: { id: g.categoryId } })
@@ -144,7 +144,6 @@ const getSumProductByCategorie = async (companyId) => {
             return { category: cat?.name ?? 'Sans catégorie', count: g._count.id };
         })
     );
-    return result;
 };
 
 // Produits avec leur fournisseur
@@ -193,6 +192,14 @@ const getOutOfStockProducts = async (companyId) => {
         }
     });
 };
+
+const getLowStockDashboard = (companyId) => {
+    return prisma.product.count({ where: { companyId ,
+            stock_quantity: { lt: prisma.product.fields.stock_min },
+        },}
+
+    )
+}
 module.exports = {
     addProduct,
     updateProduct,
@@ -206,5 +213,6 @@ module.exports = {
     getSumProductByCategorie,
     getSuppliersByProduct,
     getProductsBelowStockMin,
-    getOutOfStockProducts
+    getOutOfStockProducts,
+    getLowStockDashboard
 };

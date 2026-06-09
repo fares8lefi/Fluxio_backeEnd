@@ -8,8 +8,15 @@ const { validateUserRegistration, validateUserUpdate, validatePassword, validate
 
 const maxTime = 240 * 60 * 60;
 
-const createToken = (id) => {
-    return jwt.sign({ id }, process.env.net_Secret, { expiresIn: maxTime });
+const createAccessToken = (id) => {
+    const expiry = process.env.ACCESS_TOKEN_EXPIRY || "15m";
+    return jwt.sign({ id }, process.env.net_Secret, { expiresIn: expiry });
+};
+
+const createRefreshToken = (id) => {
+    const refreshSecret = process.env.REFRESH_TOKEN_SECRET || (process.env.net_Secret + "_refresh");
+    const expiry = process.env.REFRESH_TOKEN_EXPIRY || "10d";
+    return jwt.sign({ id }, refreshSecret, { expiresIn: expiry });
 };
 
 const createUser = async (data) => {
@@ -119,12 +126,20 @@ const loginUser = async (data) => {
     const auth = await bcrypt.compare(password, user.password);
     if (!auth) throw new Error('password invalid');
 
-    const token = createToken(user.id);
-    await userRepository.update(user.id, { last_login: new Date() });
+    const accessToken = createAccessToken(user.id);
+    const refreshToken = createRefreshToken(user.id);
+
+    // Save refresh token in DB along with last login time
+    await userRepository.update(user.id, { 
+        last_login: new Date(),
+        refreshToken: refreshToken
+    });
 
     return {
         user: { id: user.id, email: user.email, role: user.role, status: user.is_active },
-        token,
+        token: accessToken, // Backward compatibility
+        accessToken,
+        refreshToken,
         maxTime,
     };
 };
@@ -220,6 +235,63 @@ const getAllUsers = async () => {
     return await userRepository.findAll();
 };
 
+const refreshAccessToken = async (refreshToken) => {
+    if (!refreshToken) {
+        const error = new Error('Refresh token requis');
+        error.statusCode = 401;
+        throw error;
+    }
+
+    try {
+        const refreshSecret = process.env.REFRESH_TOKEN_SECRET || (process.env.net_Secret + "_refresh");
+        const decoded = jwt.verify(refreshToken, refreshSecret);
+        
+        // Find user by ID and check their stored refresh token
+        const user = await userRepository.findByIdWithPassword(decoded.id);
+        if (!user) {
+            const error = new Error('Utilisateur introuvable');
+            error.statusCode = 401;
+            throw error;
+        }
+
+        if (!user.is_active) {
+            const error = new Error('Compte non activé');
+            error.statusCode = 403;
+            throw error;
+        }
+
+        if (user.refreshToken !== refreshToken) {
+            const error = new Error('Refresh token invalide ou expiré');
+            error.statusCode = 401;
+            throw error;
+        }
+
+        // Generate new tokens (token rotation)
+        const newAccessToken = createAccessToken(user.id);
+        const newRefreshToken = createRefreshToken(user.id);
+
+        // Update database with the new refresh token
+        await userRepository.update(user.id, { refreshToken: newRefreshToken });
+
+        return {
+            accessToken: newAccessToken,
+            refreshToken: newRefreshToken,
+            user: { id: user.id, email: user.email, role: user.role, status: user.is_active }
+        };
+    } catch (err) {
+        console.error('Refresh token error:', err);
+        const error = new Error('Refresh token invalide ou expiré');
+        error.statusCode = 401;
+        throw error;
+    }
+};
+
+const logoutUser = async (id) => {
+    if (id) {
+        await userRepository.update(id, { refreshToken: null });
+    }
+};
+
 module.exports = {
     createUser,
     verifyAccounts,
@@ -231,4 +303,8 @@ module.exports = {
     updatePersonnelData,
     updateUserStatus,
     getAllUsers,
+    createAccessToken,
+    createRefreshToken,
+    refreshAccessToken,
+    logoutUser,
 };

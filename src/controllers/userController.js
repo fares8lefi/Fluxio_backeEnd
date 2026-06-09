@@ -61,15 +61,24 @@ module.exports.loginUser = async (req, res) => {
     try {
         const result = await userService.loginUser(req.body);
 
-        res.cookie("jwt_login", result.token, {
+        // Access Token: 15 minutes
+        res.cookie("jwt_login", result.accessToken, {
             httpOnly: true,
-            maxAge: result.maxTime * 1000, // maxAge en millisecondes pour Express
+            maxAge: 15 * 60 * 1000,
+        });
+
+        // Refresh Token: 10 days
+        res.cookie("jwt_refresh", result.refreshToken, {
+            httpOnly: true,
+            maxAge: result.maxTime * 1000,
         });
 
         return res.status(200).json({
             success: true,
             user:  result.user,
-            token: result.token,
+            token: result.accessToken, // Backward compatibility
+            accessToken: result.accessToken,
+            refreshToken: result.refreshToken,
         });
     } catch (error) {
         const statusCode = error.statusCode || 500;
@@ -97,13 +106,62 @@ module.exports.getConnectedUser = async (req, res) => {
 // POST /api/users/logout
 module.exports.logOutUser = async (req, res) => {
     try {
+        const id = req.user?.id || req.session?.user?.id;
+        if (id) {
+            await userService.logoutUser(id);
+        }
         res.cookie("jwt_login", "", {
+            maxAge: 1,
+            httpOnly: true,
+        });
+        res.cookie("jwt_refresh", "", {
             maxAge: 1,
             httpOnly: true,
         });
         return res.status(200).json({ success: true, message: "Déconnecté avec succès" });
     } catch (error) {
         return res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// POST /api/users/refreshToken
+module.exports.refreshToken = async (req, res) => {
+    try {
+        const tokenFromCookie = req.cookies?.jwt_refresh;
+        const tokenFromBody   = req.body?.refreshToken;
+        const authHeader      = req.headers?.authorization || req.headers?.x_refresh_token;
+        const tokenFromHeader = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : authHeader;
+
+        const refreshToken = tokenFromCookie || tokenFromBody || tokenFromHeader;
+
+        if (!refreshToken) {
+            return res.status(401).json({ success: false, error: 'Refresh token manquant' });
+        }
+
+        const result = await userService.refreshAccessToken(refreshToken);
+
+        // Set access token cookie
+        res.cookie("jwt_login", result.accessToken, {
+            httpOnly: true,
+            maxAge: 15 * 60 * 1000,
+        });
+
+        // Set refresh token cookie (rotated refresh token)
+        res.cookie("jwt_refresh", result.refreshToken, {
+            httpOnly: true,
+            maxAge: 10 * 24 * 60 * 60 * 1000,
+        });
+
+        return res.status(200).json({
+            success: true,
+            user: result.user,
+            token: result.accessToken, // Backward compatibility
+            accessToken: result.accessToken,
+            refreshToken: result.refreshToken,
+        });
+    } catch (error) {
+        const statusCode = error.statusCode || 500;
+        return res.status(statusCode).json({ success: false, message: error.message });
     }
 };
 

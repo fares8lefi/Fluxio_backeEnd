@@ -9,6 +9,7 @@ const {isAdmin}= require("../middlewares/isAdminMiddelware");
 //post
 router.post('/createUser',userController.createUser)
 router.post('/loginUser',userController.loginUser)
+router.post('/refreshToken',userController.refreshToken)
 router.post('/logOutUser', requireAuthUser, userController.logOutUser);
 router.post('/changePassword',requireAuthUser,userController.changePassword)
 router.post('/resendCode',userController.resendCode)

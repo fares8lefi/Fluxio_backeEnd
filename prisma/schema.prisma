@@ -63,6 +63,7 @@ model User {
   phone           String?   @unique
   created_at      DateTime  @default(now())
   last_login      DateTime?
+  refreshToken    String?   @db.Text
 
   company   Company? @relation(fields: [companyId], references: [id])
   companyId String?

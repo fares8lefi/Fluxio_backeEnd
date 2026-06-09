@@ -20,5 +20,7 @@ router.get('/getProductsBySupplier',requireAuthUser, productController.getSuppli
 router.get('/getProductsByCategories',requireAuthUser, productController.getProductsByCategories);
 router.get('/getSumProductByCategorie',requireAuthUser, productController.getSumProductByCategorie);
 router.get('/getProductsBelowStockMin',requireAuthUser, productController.getProductsBelowStockMin);
+router.get('/getLowStockDashboard',requireAuthUser,productController.getLowStockDashboard)
+router.get('/getOutOfStockProducts',requireAuthUser,productController.getOutOfStockProducts)
 
 module.exports = router;

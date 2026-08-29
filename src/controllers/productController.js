@@ -151,6 +151,17 @@ module.exports.getSuppliersByProduct = async function (req, res) {
 };
 
 // GET /api/products/getProductsBelowStockMin
+module.exports.getProductsBelowStockMin = async function (req, res) {
+    try {
+        const companyId = (req.user || req.session?.user)?.companyId;
+        const products = await productService.getProductsBelowStockMin(companyId);
+        return res.status(200).json({ success: true, products });
+    } catch (error) {
+        return res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// GET /api/products/getOutOfStockProducts
 module.exports.getOutOfStockProducts = async function (req, res) {
     try {
         const companyId = (req.user || req.session?.user)?.companyId;

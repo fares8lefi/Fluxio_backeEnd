@@ -44,3 +44,26 @@ module.exports.getAllMouvment = async (req, res) => {
         });
     }
 };
+
+// PUT /api/mouvments/cancel/:id
+module.exports.cancelMouvment = async (req, res) => {
+    try {
+        const user = (req.session && req.session.user) ? req.session.user : req.user;
+        const mouvmentId = req.params.id;
+        
+        const result = await mouvmentService.cancelMouvment(mouvmentId, user.companyId);
+        
+        return res.status(200).json({ 
+            success: true, 
+            message: "Mouvement annulé avec succès", 
+            mouvment: result 
+        });
+    } catch (error) {
+        console.error(error);
+        const statusCode = error.statusCode || 500;
+        return res.status(statusCode).json({ 
+            success: false, 
+            message: error.message 
+        });
+    }
+};

@@ -5,5 +5,6 @@ const { requireAuthUser } = require('../middlewares/authMiddelwares');
 
 router.post('/createMouvment',requireAuthUser, mouvmentController.createMouvment);
 router.get('/getAllMouvment',requireAuthUser, mouvmentController.getAllMouvment);
+router.put('/cancel/:id', requireAuthUser, mouvmentController.cancelMouvment);
  
 module.exports = router;

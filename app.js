@@ -12,6 +12,7 @@ const suppliersRouter = require("./src/routes/suppliersRouter");
 const productRouter = require("./src/routes/productRouter");
 const mouvmentRouter = require("./src/routes/mouvmentRouter");
 const clientRouter = require("./src/routes/clientRouter");
+const companyRouter = require("./src/routes/companyRouter");
 
 
 const app = express();
@@ -41,6 +42,7 @@ app.use("/api/suppliers", suppliersRouter);
 app.use("/api/products", productRouter);
 app.use("/api/mouvments", mouvmentRouter);
 app.use("/api/clients", clientRouter);
+app.use("/api/company", companyRouter);
 
 
 app.use((req, res) => {

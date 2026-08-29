@@ -1,7 +1,7 @@
 const prisma = require('../../config/db');
 
 // Crée un nouveau mouvement avec ses items et calcule le total_amount
-const create = async (data) => {
+const create = async (data, tx = prisma) => {
     const { items, supplierId, clientId, createdById, companyId, ...rest } = data;
 
     // Calcul du montant total figé au moment du mouvement
@@ -9,7 +9,7 @@ const create = async (data) => {
         return sum + (item.unit_price ?? 0) * item.quantity;
     }, 0);
 
-    return  prisma.movement.create({
+    return  tx.movement.create({
         data: {
             ...rest,
             total_amount,
@@ -55,8 +55,26 @@ const countAll = async (companyId) => {
     return  prisma.movement.count({ where: { companyId } });
 };
 
+// Récupère un mouvement par ID avec ses items
+const getById = async (id, companyId, tx = prisma) => {
+    return tx.movement.findFirst({
+        where: { id, companyId },
+        include: { items: true }
+    });
+};
+
+// Met à jour le statut d'un mouvement
+const updateStatus = async (id, status, tx = prisma) => {
+    return tx.movement.update({
+        where: { id },
+        data: { status }
+    });
+};
+
 module.exports = {
     create,
     findPaginated,
     countAll,
+    getById,
+    updateStatus,
 };

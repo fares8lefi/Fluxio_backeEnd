@@ -30,10 +30,10 @@ const addProduct = async (data) => {
 };
 
 // Met à jour un produit
-const updateProduct = async (data, id) => {
+const updateProduct = async (data, id, companyId, tx = prisma) => {
     const { categoryId, supplierId, ...rest } = data;
-    const product = await prisma.product.update({
-        where: { id },
+    const product = await tx.product.update({
+        where: { id, companyId },
         data: {
             ...rest,
             supplier: supplierId !== undefined
@@ -74,8 +74,8 @@ const countAll = async (companyId) => {
 };
 
 // Récupère un produit par ID (champs limités + relations)
-const getProductById = async (id, companyId) => {
-    const product = await prisma.product.findFirst({
+const getProductById = async (id, companyId, tx = prisma) => {
+    const product = await tx.product.findFirst({
         where: { id, companyId },
         select: {
             id: true, code: true, name: true,
@@ -89,8 +89,8 @@ const getProductById = async (id, companyId) => {
 };
 
 // Supprime un produit
-const deleteProduct = async (id) => {
-    return  prisma.product.delete({ where: { id } });
+const deleteProduct = async (id, companyId, tx = prisma) => {
+    return  tx.product.delete({ where: { id, companyId } });
 };
 
 // Recherche par filtres dynamiques

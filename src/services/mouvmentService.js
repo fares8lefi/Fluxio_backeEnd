@@ -156,20 +156,58 @@ const cancelMouvment = async (mouvmentId, companyId) => {
 };
 
 /**
- * Récupère les mouvements paginés de la compagnie
+ * Récupère les mouvements paginés avec filtres optionnels
+ * Filtres supportés : type, status, clientId, supplierId, startDate, endDate
  */
-const getAllMouvments = async (page, companyId) => {
+const getAllMouvments = async (page, companyId, filters = {}) => {
     const limit = parseInt(process.env.limitByPage) || 10;
     const numbrePage = parseInt(page) || 1;
 
-    const mouvments = await mouvmentRepository.findPaginated(numbrePage, limit, companyId);
-    const count     = await mouvmentRepository.countAll(companyId);
+    const mouvments = await mouvmentRepository.findPaginated(numbrePage, limit, companyId, filters);
+    const count     = await mouvmentRepository.countFiltered(companyId, filters);
 
     return { mouvments, count };
+};
+
+/**
+ * Récupère tous les mouvements liés à un client
+ */
+const getMouvmentsByClient = async (clientId, companyId) => {
+    if (!clientId) {
+        const error = new Error('clientId est requis');
+        error.statusCode = 400;
+        throw error;
+    }
+    const mouvments = await mouvmentRepository.findByClientId(clientId, companyId);
+    return { mouvments, count: mouvments.length };
+};
+
+/**
+ * Récupère tous les mouvements liés à un fournisseur
+ */
+const getMouvmentsBySupplier = async (supplierId, companyId) => {
+    if (!supplierId) {
+        const error = new Error('supplierId est requis');
+        error.statusCode = 400;
+        throw error;
+    }
+    const mouvments = await mouvmentRepository.findBySupplierId(supplierId, companyId);
+    return { mouvments, count: mouvments.length };
 };
 
 module.exports = {
     createMouvment,
     cancelMouvment,
     getAllMouvments,
+    getMouvmentsByClient,
+    getMouvmentsBySupplier,
+    getMouvmentById: async (id, companyId) => {
+        const mouvment = await mouvmentRepository.getById(id, companyId);
+        if (!mouvment) {
+            const error = new Error('Mouvement introuvable');
+            error.statusCode = 404;
+            throw error;
+        }
+        return mouvment;
+    },
 };

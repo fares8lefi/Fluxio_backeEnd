@@ -81,7 +81,28 @@ const resendCode = async (email) => {
     await sendEmailVerificationCode(email, user.username, code);
 };
 
-const forgetPasswordVerifyCode = async (email, newPassword) => {
+/**
+ * Étape 1 — Initier la réinitialisation du mot de passe :
+ * Génère un code OTP et l'envoie par email.
+ */
+const forgetPassword = async (email) => {
+    const user = await userRepository.findOneByEmailWithPassword(email);
+    if (!user) {
+        // Par sécurité on ne révèle pas si l'email existe ou non
+        return;
+    }
+
+    const code = Math.floor(1000 + Math.random() * 9000);
+    const code_expires_at = new Date(Date.now() + 10 * 60 * 1000);
+    await userRepository.update(user.id, { code, code_expires_at });
+
+    await sendEmailResetCode(email, user.username, code);
+};
+
+/**
+ * Étape 2 — Vérifier le code OTP et définir le nouveau mot de passe.
+ */
+const forgetPasswordVerifyCode = async (email, code, newPassword) => {
     const { errors, isValid } = validatePassword(newPassword);
     if (!isValid) {
         const error = new Error('Validation échouée');
@@ -97,15 +118,26 @@ const forgetPasswordVerifyCode = async (email, newPassword) => {
         throw error;
     }
 
-    const code = Math.floor(1000 + Math.random() * 9000);
-    const code_expires_at = new Date(Date.now() + 10 * 60 * 1000);
-    await userRepository.update(user.id, { code, code_expires_at });
+    if (String(user.code) !== String(code)) {
+        const error = new Error('Code invalide');
+        error.statusCode = 400;
+        throw error;
+    }
 
-    await sendEmailResetCode(email, user.username, code);
+    if (user.code_expires_at && new Date() > new Date(user.code_expires_at)) {
+        const error = new Error('Code expiré. Veuillez en demander un nouveau.');
+        error.statusCode = 400;
+        throw error;
+    }
 
     const salt = await bcrypt.genSalt();
     const hashedPassword = await bcrypt.hash(newPassword, salt);
-    await userRepository.update(user.id, { password: hashedPassword });
+    // Invalider le code après utilisation
+    await userRepository.update(user.id, {
+        password: hashedPassword,
+        code: null,
+        code_expires_at: null,
+    });
 };
 
 const loginUser = async (data) => {
@@ -292,10 +324,26 @@ const logoutUser = async (id) => {
     }
 };
 
+const deleteUser = async (targetId, requesterId) => {
+    if (targetId === requesterId) {
+        const error = new Error('Vous ne pouvez pas supprimer votre propre compte');
+        error.statusCode = 403;
+        throw error;
+    }
+    const user = await userRepository.findById(targetId);
+    if (!user) {
+        const error = new Error('Utilisateur introuvable');
+        error.statusCode = 404;
+        throw error;
+    }
+    await userRepository.deleteById(targetId);
+};
+
 module.exports = {
     createUser,
     verifyAccounts,
     resendCode,
+    forgetPassword,
     forgetPasswordVerifyCode,
     loginUser,
     getConnectedUser,
@@ -303,6 +351,7 @@ module.exports = {
     updatePersonnelData,
     updateUserStatus,
     getAllUsers,
+    deleteUser,
     createAccessToken,
     createRefreshToken,
     refreshAccessToken,

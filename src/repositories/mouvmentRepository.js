@@ -34,12 +34,68 @@ const create = async (data, tx = prisma) => {
     });
 };
 
-// Récupère les mouvements avec pagination
-const findPaginated = async (page, limit, companyId) => {
-    return  prisma.movement.findMany({
-        where: { companyId },
+// Récupère les mouvements avec pagination et filtres optionnels
+const findPaginated = async (page, limit, companyId, filters = {}) => {
+    const where = { companyId };
+
+    if (filters.type)      where.type   = filters.type;
+    if (filters.status)    where.status = filters.status;
+    if (filters.clientId)  where.clientId  = filters.clientId;
+    if (filters.supplierId) where.supplierId = filters.supplierId;
+
+    if (filters.startDate || filters.endDate) {
+        where.created_at = {};
+        if (filters.startDate) where.created_at.gte = new Date(filters.startDate);
+        if (filters.endDate)   where.created_at.lte = new Date(filters.endDate);
+    }
+
+    return prisma.movement.findMany({
+        where,
         skip: (page - 1) * limit,
         take: limit,
+        include: {
+            items:      { include: { product: true } },
+            supplier:   true,
+            client:     true,
+            created_by: { select: { id: true, username: true } },
+        },
+        orderBy: { created_at: 'desc' },
+    });
+};
+
+// Compte les mouvements avec les mêmes filtres
+const countFiltered = async (companyId, filters = {}) => {
+    const where = { companyId };
+    if (filters.type)       where.type       = filters.type;
+    if (filters.status)     where.status     = filters.status;
+    if (filters.clientId)   where.clientId   = filters.clientId;
+    if (filters.supplierId) where.supplierId = filters.supplierId;
+    if (filters.startDate || filters.endDate) {
+        where.created_at = {};
+        if (filters.startDate) where.created_at.gte = new Date(filters.startDate);
+        if (filters.endDate)   where.created_at.lte = new Date(filters.endDate);
+    }
+    return prisma.movement.count({ where });
+};
+
+// Récupère tous les mouvements d'un client donné
+const findByClientId = async (clientId, companyId) => {
+    return prisma.movement.findMany({
+        where: { clientId, companyId },
+        include: {
+            items:      { include: { product: true } },
+            supplier:   true,
+            client:     true,
+            created_by: { select: { id: true, username: true } },
+        },
+        orderBy: { created_at: 'desc' },
+    });
+};
+
+// Récupère tous les mouvements d'un fournisseur donné
+const findBySupplierId = async (supplierId, companyId) => {
+    return prisma.movement.findMany({
+        where: { supplierId, companyId },
         include: {
             items:      { include: { product: true } },
             supplier:   true,
@@ -55,11 +111,13 @@ const countAll = async (companyId) => {
     return  prisma.movement.count({ where: { companyId } });
 };
 
-// Récupère un mouvement par ID avec ses items
+// Récupère un mouvement par ID avec ses items et produits
 const getById = async (id, companyId, tx = prisma) => {
     return tx.movement.findFirst({
         where: { id, companyId },
-        include: { items: true }
+        include: { 
+            items: { include: { product: true } }
+        }
     });
 };
 
@@ -75,6 +133,9 @@ module.exports = {
     create,
     findPaginated,
     countAll,
+    countFiltered,
     getById,
     updateStatus,
+    findByClientId,
+    findBySupplierId,
 };

@@ -13,12 +13,18 @@ const getMyCompany = async (companyId) => {
 
 const updateMyCompany = async (companyId, data) => {
     if (!companyId) throw new Error("companyId manquant");
-    if (!data.name) {
-        const err = new Error("Le nom de l'entreprise est requis");
-        err.statusCode = 400;
-        throw err;
+    
+    const updates = {};
+    if (data.name !== undefined) updates.name = data.name;
+    if (data.matriculeFiscale !== undefined) updates.matriculeFiscale = data.matriculeFiscale;
+    if (data.address !== undefined) updates.address = data.address;
+    if (data.phone !== undefined) updates.phone = data.phone;
+    
+    if (Object.keys(updates).length === 0) {
+        throw new Error("Aucune donnée à mettre à jour");
     }
-    return await companyRepository.update(companyId, { name: data.name });
+
+    return await companyRepository.update(companyId, updates);
 };
 
 module.exports = {

@@ -75,6 +75,11 @@ const verifPasswordUser = async (id, currentPassword) => {
     return  bcrypt.compare(currentPassword, user.password);
 };
 
+// Supprime définitivement un utilisateur (admin only)
+const deleteById = async (id) => {
+    return prisma.user.delete({ where: { id } });
+};
+
 module.exports = {
     create,
     findOneByEmail,
@@ -84,4 +89,5 @@ module.exports = {
     update,
     findAll,
     verifPasswordUser,
+    deleteById,
 };

@@ -86,6 +86,17 @@ const deactivateSupplier = async (id, companyId) => {
     await supplierRepository.deactivate(id);
 };
 
+// Récupère un fournisseur par son ID
+const getSupplierById = async (id, companyId) => {
+    const supplier = await supplierRepository.findById(id, companyId);
+    if (!supplier) {
+        const error = new Error('Fournisseur introuvable');
+        error.statusCode = 404;
+        throw error;
+    }
+    return supplier;
+};
+
 module.exports = {
     addSupplier,
     updateSupplier,
@@ -94,4 +105,5 @@ module.exports = {
     getAllSuppliers,
     searchSuppliersByName,
     deactivateSupplier,
+    getSupplierById,
 };

@@ -32,15 +32,24 @@ enum MovementStatus {
   CANCELLED
 }
 
+enum InvoiceStatus {
+  PENDING
+  PAID
+  CANCELLED
+}
+
 // ─────────────────────────────────────────
 // Models
 // ─────────────────────────────────────────
 
 model Company {
-  id         String   @id @default(cuid())
-  name       String
-  created_at DateTime @default(now())
-  is_active  Boolean  @default(true)
+  id               String   @id @default(cuid())
+  name             String
+  matriculeFiscale String?  // Requis pour la facturation tunisienne
+  address          String?
+  phone            String?
+  created_at       DateTime @default(now())
+  is_active        Boolean  @default(true)
 
   users      User[]
   categories Category[]
@@ -48,6 +57,7 @@ model Company {
   products   Product[]
   movements  Movement[]
   clients    Client[]
+  invoices   Invoice[]
 }
 
 model User {
@@ -74,8 +84,8 @@ model User {
 
 model Category {
   id          String   @id @default(cuid())
-  name        String   @unique
-  code        Int      @unique
+  name        String
+  code        Int
   description String?
   is_active   Boolean  @default(true)
   created_at  DateTime @default(now())
@@ -84,6 +94,9 @@ model Category {
   companyId String?
 
   products Product[]
+
+  @@unique([name, companyId])
+  @@unique([code, companyId])
 }
 
 model Supplier {
@@ -157,7 +170,8 @@ model Movement {
   company   Company? @relation(fields: [companyId], references: [id])
   companyId String?
 
-  items MovementItem[]
+  items    MovementItem[]
+  invoice  Invoice?
 }
 
 model MovementItem {
@@ -181,6 +195,7 @@ model Client {
   matriculeFiscale String  @unique
   // Code TVA : chaîne alphanumérique (pas un Float)
   codeTva          String?
+  address          String?
   is_active        Boolean @default(true)
 
   movements Movement[]
@@ -190,4 +205,29 @@ model Client {
 
   user   User?   @relation(fields: [userId], references: [id])
   userId String?
+  
+  invoices Invoice[]
+}
+// Append Invoice model to schema
+model Invoice {
+  id              String        @id @default(cuid())
+  reference       String        @unique
+  date            DateTime      @default(now())
+  
+  // Montants selon la norme tunisienne
+  total_ht        Float
+  tva_amount      Float
+  timbre_fiscal   Float         @default(1.000) // Timbre fiscal tunisien actuel (1 DT)
+  total_ttc       Float         // total_ht + tva_amount + timbre_fiscal
+  
+  status          InvoiceStatus @default(PENDING)
+  
+  movement   Movement @relation(fields: [movementId], references: [id])
+  movementId String   @unique
+  
+  client     Client?  @relation(fields: [clientId], references: [id])
+  clientId   String?
+  
+  company    Company  @relation(fields: [companyId], references: [id])
+  companyId  String
 }

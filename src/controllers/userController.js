@@ -40,11 +40,30 @@ module.exports.resendCode = async (req, res) => {
     }
 };
 
-// POST /api/users/forgetPassword
+// POST /api/users/forgetPassword — Étape 1 : envoyer le code OTP de réinitialisation
+module.exports.forgetPassword = async (req, res) => {
+    try {
+        const { email } = req.body;
+        if (!email) {
+            return res.status(400).json({ success: false, message: "L'email est requis" });
+        }
+        await userService.forgetPassword(email);
+        // Réponse générique pour ne pas révéler si l'email existe
+        return res.status(200).json({
+            success: true,
+            message: "Si cet email est enregistré, un code de réinitialisation a été envoyé.",
+        });
+    } catch (error) {
+        const statusCode = error.statusCode || 500;
+        return res.status(statusCode).json({ success: false, message: error.message });
+    }
+};
+
+// PUT /api/users/foorgetPasswordVerifyCode — Étape 2 : vérifier le code et changer le mot de passe
 module.exports.foorgetPasswordVerifyCode = async (req, res) => {
     try {
-        const { email, newPassword } = req.body;
-        await userService.forgetPasswordVerifyCode(email, newPassword);
+        const { email, code, newPassword } = req.body;
+        await userService.forgetPasswordVerifyCode(email, code, newPassword);
         return res.status(200).json({ message: "Mot de passe modifié avec succès", success: true });
     } catch (error) {
         const statusCode = error.statusCode || 500;
@@ -92,14 +111,26 @@ module.exports.loginUser = async (req, res) => {
 
 // GET /api/users/me
 // Correction : utilise `req.user?.id` (Prisma) au lieu de `req.session.user?._id` (Mongoose)
-module.exports.getConnectedUser = async (req, res) => {
+module.exports.getConnectedUser = async function (req,res){
     try {
-        const id = req.user?.id || req.session?.user?.id;
-        const user = await userService.getConnectedUser(id);
-        return res.status(200).json({ success: true, user });
+        const userId = req.query.id; 
+        const user = await userService.getConnectedUser(userId);
+        res.status(200).json({ success: true, user: user });
     } catch (error) {
+        console.error(error);
         const statusCode = error.statusCode || 500;
-        return res.status(statusCode).json({ success: false, message: error.message });
+        res.status(statusCode).json({ success: false, message: error.message });
+    }
+}
+
+module.exports.getMe = async function (req, res) {
+    try {
+        const user = (req.session && req.session.user) ? req.session.user : req.user;
+        res.status(200).json({ success: true, user: user });
+    } catch (error) {
+        console.error(error);
+        const statusCode = error.statusCode || 500;
+        res.status(statusCode).json({ success: false, message: error.message });
     }
 };
 
@@ -223,5 +254,17 @@ module.exports.getAllUsers = async (req, res) => {
         return res.status(200).json({ success: true, users });
     } catch (error) {
         return res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// DELETE /api/users/:id  (admin seulement)
+module.exports.deleteUser = async (req, res) => {
+    try {
+        const requesterId = req.user?.id || req.session?.user?.id;
+        await userService.deleteUser(req.params.id, requesterId);
+        return res.status(200).json({ success: true, message: 'Utilisateur supprimé avec succès' });
+    } catch (error) {
+        const statusCode = error.statusCode || 500;
+        return res.status(statusCode).json({ success: false, message: error.message });
     }
 };

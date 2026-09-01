@@ -10,5 +10,7 @@ router.get('/getAllSuppliers',              requireAuthUser, suppliersController
 router.get('/getActiveSuppliers',          requireAuthUser, suppliersController.getActiveSuppliers);
 router.patch('/updateSuppliersStatus/:id', requireAuthUser, suppliersController.updateSuppliersStatus);
 router.get('/searchSuppliersByName',       requireAuthUser, suppliersController.searchSuppliersByName);
+// Route paramétrique en dernier pour éviter les conflits
+router.get('/:id',                         requireAuthUser, suppliersController.getSupplierById);
 
 module.exports = router;

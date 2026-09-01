@@ -162,27 +162,25 @@ const getSuppliersByProduct = async (companyId) => {
 };
 
 // Produits dont le stock est en dessous du minimum
+// Note: Prisma ne supporte pas la comparaison de deux colonnes dans un where,
+// on récupère tous les produits et on filtre en JS.
 const getProductsBelowStockMin = async (companyId) => {
-    return  prisma.product.findMany({
-        where: {
-            companyId,
-            stock_quantity: { lt: prisma.product.fields.stock_min },
-        },
+    const products = await prisma.product.findMany({
+        where: { companyId },
         select: {
             id: true, name: true, code: true,
             stock_quantity: true, stock_min: true,
             supplier: { select: { name: true } },
         },
     });
+    return products.filter(p => p.stock_quantity < p.stock_min);
 };
 
 const getOutOfStockProducts = async (companyId) => {
     return prisma.product.findMany({
         where: {
             companyId,
-            stock_quantity: {
-                equals: 0
-            }
+            stock_quantity: { equals: 0 }
         },
         select: {
             id: true,
@@ -193,12 +191,12 @@ const getOutOfStockProducts = async (companyId) => {
     });
 };
 
-const getLowStockDashboard = (companyId) => {
-    return prisma.product.count({ where: { companyId ,
-            stock_quantity: { lt: prisma.product.fields.stock_min },
-        },}
-
-    )
+const getLowStockDashboard = async (companyId) => {
+    const products = await prisma.product.findMany({
+        where: { companyId },
+        select: { stock_quantity: true, stock_min: true },
+    });
+    return products.filter(p => p.stock_quantity < p.stock_min).length;
 }
 module.exports = {
     addProduct,

@@ -13,6 +13,7 @@ router.post('/refreshToken',userController.refreshToken)
 router.post('/logOutUser', requireAuthUser, userController.logOutUser);
 router.post('/changePassword',requireAuthUser,userController.changePassword)
 router.post('/resendCode',userController.resendCode)
+router.post('/forgetPassword', userController.forgetPassword)
 
 //put
 router.put('/updatePersonnelData',requireAuthUser,userController.updatePersonnelData)
@@ -22,6 +23,11 @@ router.put('/verifyAccounts',userController.verifyAccounts)
 
 
 //get
+router.get('/me', requireAuthUser, userController.getMe);
 router.get('/getAllUsers',requireAuthUser,isAdmin,userController.getAllUsers)
 router.get('/getConnectedUser',requireAuthUser,isAdmin,userController.getConnectedUser)
+
+//delete
+router.delete('/:id', requireAuthUser, isAdmin, userController.deleteUser)
+
 module.exports = router;

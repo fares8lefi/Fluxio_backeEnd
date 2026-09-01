@@ -68,7 +68,7 @@ const deleteProduct = async (id, companyId) => {
         error.statusCode = 404;
         throw error;
     }
-    return await productRepository.deleteProduct(id);
+    return await productRepository.deleteProduct(id, companyId);
 };
 
 // Récupère tous les produits (liste simple)
@@ -123,7 +123,7 @@ const updateProduct = async (id, data, companyId) => {
     if (supplierId     !== undefined) updates.supplierId     = supplierId;
     if (categoryId     !== undefined) updates.categoryId     = categoryId;
 
-    return await productRepository.updateProduct(updates, id);
+    return await productRepository.updateProduct(updates, id, companyId);
 };
 
 // Recherche par filtres dynamiques

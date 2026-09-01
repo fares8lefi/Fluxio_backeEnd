@@ -100,3 +100,18 @@ module.exports.searchClientsByName = async (req, res) => {
         });
     }
 };
+
+// GET /api/clients/:id
+module.exports.getClientById = async (req, res) => {
+    try {
+        const companyId = (req.user || req.session?.user)?.companyId;
+        const client = await clientService.getClientByID(req.params.id, companyId);
+        return res.status(200).json({ success: true, client });
+    } catch (error) {
+        const statusCode = error.statusCode || 500;
+        return res.status(statusCode).json({
+            success: false,
+            message: error.message,
+        });
+    }
+};

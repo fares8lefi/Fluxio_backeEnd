@@ -66,9 +66,32 @@ const deleteCategory = async (id, companyId) => {
     await categorieRepository.deleteById(id);
 };
 
+// Récupère une catégorie par son ID
+const getCategoryById = async (id, companyId) => {
+    const categorie = await categorieRepository.getById(id, companyId);
+    if (!categorie) {
+        const error = new Error('Catégorie introuvable');
+        error.statusCode = 404;
+        throw error;
+    }
+    return categorie;
+};
+
+// Recherche des catégories par nom (insensible à la casse)
+const searchCategoriesByName = async (name, companyId) => {
+    if (!name) {
+        const error = new Error('Le paramètre name est requis');
+        error.statusCode = 400;
+        throw error;
+    }
+    return await categorieRepository.findByName(name, companyId);
+};
+
 module.exports = {
     createCategory,
     getAllCategories,
     updateCategory,
     deleteCategory,
+    getCategoryById,
+    searchCategoriesByName,
 };

@@ -103,3 +103,15 @@ module.exports.getAllSuppliers = async function (req, res) {
         return res.status(statusCode).json({ success: false, message: error.message });
     }
 };
+
+// GET /api/suppliers/:id
+module.exports.getSupplierById = async function (req, res) {
+    try {
+        const companyId = (req.user || req.session?.user)?.companyId;
+        const supplier = await supplierService.getSupplierById(req.params.id, companyId);
+        return res.status(200).json({ success: true, supplier });
+    } catch (error) {
+        const statusCode = error.statusCode || 500;
+        return res.status(statusCode).json({ success: false, message: error.message });
+    }
+};

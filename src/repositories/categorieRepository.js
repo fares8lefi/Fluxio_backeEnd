@@ -46,6 +46,16 @@ const existsWithCodeOrName = async (code, name, companyId) => {
     return !!existing;
 };
 
+// Recherche des catégories par nom (insensible à la casse)
+const findByName = async (name, companyId) => {
+    return prisma.category.findMany({
+        where: {
+            name: { contains: name },
+            companyId,
+        },
+    });
+};
+
 module.exports = {
     getAll,
     getById,
@@ -53,4 +63,5 @@ module.exports = {
     update,
     deleteById,
     existsWithCodeOrName,
+    findByName,
 };

@@ -15,6 +15,7 @@ const clientRouter = require("./src/routes/clientRouter");
 const companyRouter = require("./src/routes/companyRouter");
 const invoiceRouter = require("./src/routes/invoiceRouter");
 const dashboardRouter = require("./src/routes/dashboardRouter");
+const healthRouter = require("./src/routes/healthRouter");
 
 
 const app = express();
@@ -47,7 +48,7 @@ app.use("/api/clients", clientRouter);
 app.use("/api/company", companyRouter);
 app.use("/api/invoices", invoiceRouter);
 app.use("/api/dashboard", dashboardRouter);
-
+app.use("/health", healthRouter);
 
 app.use((req, res) => {
   res.status(404).json({

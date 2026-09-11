@@ -13,10 +13,12 @@
     "format": "prettier --write ."
   },
   "dependencies": {
+    "@neon/config": "^1.4.2",
+    "@neon/env": "^1.3.2",
     "@prisma/client": "^5.22.0",
     "bcrypt": "^6.0.0",
     "cookie-parser": "~1.4.4",
-    "cros": "^1.1.0",
+    "cors": "^2.8.6",
     "debug": "~2.6.9",
     "dotenv": "^17.2.3",
     "express": "~4.16.1",

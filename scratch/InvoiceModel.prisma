@@ -1,0 +1,23 @@
+// Append Invoice model to schema
+model Invoice {
+  id              String        @id @default(cuid())
+  reference       String        @unique
+  date            DateTime      @default(now())
+  
+  // Montants selon la norme tunisienne
+  total_ht        Float
+  tva_amount      Float
+  timbre_fiscal   Float         @default(1.000) // Timbre fiscal tunisien actuel (1 DT)
+  total_ttc       Float         // total_ht + tva_amount + timbre_fiscal
+  
+  status          InvoiceStatus @default(PENDING)
+  
+  movement   Movement @relation(fields: [movementId], references: [id])
+  movementId String   @unique
+  
+  client     Client?  @relation(fields: [clientId], references: [id])
+  clientId   String?
+  
+  company    Company  @relation(fields: [companyId], references: [id])
+  companyId  String
+}

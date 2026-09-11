@@ -4,7 +4,7 @@ services:
   db:
     image: mongo
     ports:
-      - "27017:27017"
+      - '27017:27017'
   backend:
     build: .
     env_file:
@@ -12,4 +12,4 @@ services:
     depends_on:
       - db
     ports:
-      - "3000:3000"
+      - '3000:3000'

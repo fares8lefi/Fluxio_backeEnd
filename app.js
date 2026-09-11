@@ -1,88 +1,91 @@
-const express = require("express");
-const path = require("path");
-const cookieParser = require("cookie-parser");
-const logger = require("morgan");
-const session = require("express-session");
-require("dotenv").config();
-const prisma = require("./config/db");
+const express = require('express');
+const path = require('path');
+const cookieParser = require('cookie-parser');
+const logger = require('morgan');
+const session = require('express-session');
+const cors = require('cors');
+require('dotenv').config();
+const prisma = require('./config/db');
 
-const usersRouter = require("./src/routes/usersRouter");
-const categorieRouter = require("./src/routes/categorieRouter");
-const suppliersRouter = require("./src/routes/suppliersRouter");
-const productRouter = require("./src/routes/productRouter");
-const mouvmentRouter = require("./src/routes/mouvmentRouter");
-const clientRouter = require("./src/routes/clientRouter");
-const companyRouter = require("./src/routes/companyRouter");
-const invoiceRouter = require("./src/routes/invoiceRouter");
-const dashboardRouter = require("./src/routes/dashboardRouter");
-const healthRouter = require("./src/routes/healthRouter");
-
+const usersRouter = require('./src/routes/usersRouter');
+const categorieRouter = require('./src/routes/categorieRouter');
+const suppliersRouter = require('./src/routes/suppliersRouter');
+const productRouter = require('./src/routes/productRouter');
+const mouvmentRouter = require('./src/routes/mouvmentRouter');
+const clientRouter = require('./src/routes/clientRouter');
+const companyRouter = require('./src/routes/companyRouter');
+const invoiceRouter = require('./src/routes/invoiceRouter');
+const dashboardRouter = require('./src/routes/dashboardRouter');
+const healthRouter = require('./src/routes/healthRouter');
 
 const app = express();
 
-
-app.use(logger("dev"));
+app.use(logger('dev'));
+app.use(
+  cors({
+    origin: (process.env.FRONTEND_URL || 'http://localhost:5173').split(','),
+    credentials: true,
+  })
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 
 app.use(
   session({
-    secret: process.env.SESSION_SECRET || "default_session_secret",
+    secret: process.env.SESSION_SECRET || 'default_session_secret',
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: false }, 
+    cookie: { secure: false },
   })
 );
 
+app.use(express.static(path.join(__dirname, 'public')));
 
-app.use(express.static(path.join(__dirname, "public")));
-
-
-app.use("/api/users", usersRouter);
-app.use("/api/categories", categorieRouter);
-app.use("/api/suppliers", suppliersRouter);
-app.use("/api/products", productRouter);
-app.use("/api/mouvments", mouvmentRouter);
-app.use("/api/clients", clientRouter);
-app.use("/api/company", companyRouter);
-app.use("/api/invoices", invoiceRouter);
-app.use("/api/dashboard", dashboardRouter);
-app.use("/health", healthRouter);
+app.use('/api/users', usersRouter); // test valid
+app.use('/api/categories', categorieRouter); // test valid
+app.use('/api/suppliers', suppliersRouter); //test valid
+app.use('/api/products', productRouter); // test valid
+app.use('/api/mouvments', mouvmentRouter);
+app.use('/api/clients', clientRouter);
+app.use('/api/company', companyRouter); // test valid
+app.use('/api/invoices', invoiceRouter);
+app.use('/api/dashboard', dashboardRouter);
+app.use('/health', healthRouter); // test valid
 
 app.use((req, res) => {
   res.status(404).json({
     success: false,
-    message: "Route not found",
+    message: 'Route not found',
     path: req.originalUrl,
   });
 });
 
-
+// eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
   console.error(err);
 
   res.status(err.status || 500).json({
     success: false,
-    message: err.message || "Internal Server Error",
+    message: err.message || 'Internal Server Error',
   });
 });
 
-
-const http = require("http");
+const http = require('http');
 const server = http.createServer(app);
 
 const PORT = process.env.PORT || 3000;
 
-prisma.$connect()
+prisma
+  .$connect()
   .then(() => {
-    console.log(" Connecté avec succès à la base de données MySQL !");
-    server.listen(PORT, "0.0.0.0", () => {
+    console.log(' Connecté avec succès à la base de données MySQL !');
+    server.listen(PORT, '0.0.0.0', () => {
       console.log(`Server is running on port ${PORT}`);
     });
   })
   .catch((err) => {
-    console.error(" Erreur de connexion à la base de données :", err);
+    console.error(' Erreur de connexion à la base de données :', err);
     process.exit(1);
   });
 

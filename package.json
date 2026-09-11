@@ -9,6 +9,7 @@
     "start": "node app.js",
     "dev": "nodemon app.js",
     "test": "jest",
+    "e2e": "artillery run tests/artillerr.yml",
     "lint": "eslint .",
     "format": "prettier --write ."
   },

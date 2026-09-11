@@ -1,7 +1,7 @@
-﻿const dashboardService = require('../../src/services/dashboardService');
-const prisma = require('../../config/db');
+const dashboardService = require('../../../src/services/dashboardService');
+const prisma = require('../../../config/db');
 
-jest.mock('../../config/db', () => ({
+jest.mock('../../../config/db', () => ({
   user: { count: jest.fn() },
   product: { count: jest.fn(), findMany: jest.fn() },
   mouvment: { findMany: jest.fn() },

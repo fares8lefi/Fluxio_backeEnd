@@ -1,7 +1,7 @@
-﻿const mouvmentService = require('../../src/services/mouvmentService');
-const prisma = require('../../config/db');
+const mouvmentService = require('../../../src/services/mouvmentService');
+const prisma = require('../../../config/db');
 
-jest.mock('../../config/db', () => ({
+jest.mock('../../../config/db', () => ({
   mouvment: { findMany: jest.fn(), create: jest.fn() },
   product: { findUnique: jest.fn(), update: jest.fn() },
 }));

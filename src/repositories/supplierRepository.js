@@ -81,5 +81,5 @@ module.exports = {
   update,
   deleteById,
   deactivate,
-  activate
+  activate,
 };

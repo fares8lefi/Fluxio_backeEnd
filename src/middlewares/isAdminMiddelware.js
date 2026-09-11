@@ -11,7 +11,7 @@ const isAdmin = (req, res, next) => {
     }
 
     next();
-  } catch (error) {
+  } catch {
     return res.status(500).json({ message: 'Erreur middleware admin' });
   }
 };

@@ -150,13 +150,13 @@ const getSumProductByCategorie = async (companyId) => {
     GROUP BY categoryId
   `;
 
-  const categoryIds = result.map(g => g.categoryId).filter(Boolean);
+  const categoryIds = result.map((g) => g.categoryId).filter(Boolean);
   const categories = await prisma.category.findMany({
     where: { id: { in: categoryIds } },
   });
 
   return result.map((g) => {
-    const cat = categories.find(c => c.id === g.categoryId);
+    const cat = categories.find((c) => c.id === g.categoryId);
     return {
       category: cat?.name ?? 'Sans catégorie',
       product_count: Number(g.product_count),

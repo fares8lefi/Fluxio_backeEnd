@@ -27,6 +27,11 @@ const userRegistrationSchema = z.object({
     .string({ required_error: 'Company name is required' })
     .trim()
     .min(1, 'Company name is required'),
+
+  matriculeFiscale: z
+    .string({ required_error: 'Tax identification number is required' })
+    .trim()
+    .min(1, 'Tax identification number is required'),
 });
 
 const userUpdateSchema = z.object({

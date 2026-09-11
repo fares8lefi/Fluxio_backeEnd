@@ -2,13 +2,6 @@ const { z } = require('zod');
 
 // ─── Sub-schemas ─────────────────────────────────────────────────────────────
 
-/**
- * Regex pour valider un CUID (format Prisma par défaut).
- * Un CUID commence par 'c' suivi de caractères alphanumériques.
- * On accepte aussi les UUIDs pour flexibilité.
- */
-const cuidRegex = /^[a-z0-9]{20,30}$/i;
-
 const mouvmentItemSchema = z.object({
   productId: z
     .string({ required_error: 'Le produit (productId) est requis' })

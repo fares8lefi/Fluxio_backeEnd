@@ -118,5 +118,5 @@ module.exports = {
   searchSuppliersByName,
   deactivateSupplier,
   getSupplierById,
-  activateSupplier
+  activateSupplier,
 };

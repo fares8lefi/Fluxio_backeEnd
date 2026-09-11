@@ -8,7 +8,7 @@ module.exports.getHealth = async (req, res) => {
   let dbStatus = 'ok';
   try {
     await prisma.$queryRaw`SELECT 1`;
-  } catch (err) {
+  } catch {
     dbStatus = 'error';
   }
 

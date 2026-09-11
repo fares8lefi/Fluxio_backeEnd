@@ -35,7 +35,6 @@ const createUser = async (data) => {
 
   const { username, password, phone, email, company_name, matriculeFiscale } = data;
 
-
   const existingUser = await userRepository.findOneByEmail(email);
   if (existingUser) {
     const error = new Error('Un compte avec cet email existe déjà.');

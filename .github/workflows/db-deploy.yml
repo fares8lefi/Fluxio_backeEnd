@@ -1,0 +1,36 @@
+name: Database Deploy
+
+on:
+  push:
+    branches:
+      - main
+      - production
+    paths:
+      - 'prisma/**'
+      - 'neon.ts'
+      - '.env.example'
+
+jobs:
+  db-deploy:
+    name: Neon DB Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Neon CLI
+        run: npm i -g neon@latest
+
+      - name: Neon Deploy
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+        run: neon deploy --project-id summer-waterfall-27252383 --branch production

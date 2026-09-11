@@ -76,17 +76,20 @@ const server = http.createServer(app);
 
 const PORT = process.env.PORT || 3000;
 
-prisma
-  .$connect()
-  .then(() => {
-    console.log(' Connecté avec succès à la base de données MySQL !');
-    server.listen(PORT, '0.0.0.0', () => {
-      console.log(`Server is running on port ${PORT}`);
+// Only start the server when run directly (not when imported by tests)
+if (require.main === module) {
+  prisma
+    .$connect()
+    .then(() => {
+      console.log(' Connecté avec succès à la base de données MySQL !');
+      server.listen(PORT, '0.0.0.0', () => {
+        console.log(`Server is running on port ${PORT}`);
+      });
+    })
+    .catch((err) => {
+      console.error(' Erreur de connexion à la base de données :', err);
+      process.exit(1);
     });
-  })
-  .catch((err) => {
-    console.error(' Erreur de connexion à la base de données :', err);
-    process.exit(1);
-  });
+}
 
 module.exports = app;

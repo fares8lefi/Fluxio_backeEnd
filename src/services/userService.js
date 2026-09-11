@@ -33,12 +33,21 @@ const createUser = async (data) => {
     throw error;
   }
 
-  const { username, password, phone, email, company_name , matriculeFiscale} = data;
+  const { username, password, phone, email, company_name, matriculeFiscale } = data;
+
+
+  const existingUser = await userRepository.findOneByEmail(email);
+  if (existingUser) {
+    const error = new Error('Un compte avec cet email existe déjà.');
+    error.statusCode = 409;
+    throw error;
+  }
+
   const code = Math.floor(1000 + Math.random() * 9000);
   // Le code OTP expire dans 10 minutes
   const code_expires_at = new Date(Date.now() + 10 * 60 * 1000);
 
-  const company = await companyRepository.create({ name: company_name ,  matriculeFiscale : matriculeFiscale});
+  const company = await companyRepository.create({ name: company_name, matriculeFiscale });
 
   await Promise.all([
     userRepository.create({
@@ -181,8 +190,15 @@ const loginUser = async (data) => {
     refreshToken: refreshToken,
   });
 
+  const userCompany = user.companyId ? await companyRepository.findById(user.companyId) : null;
   return {
-    user: { id: user.id, email: user.email, role: user.role, status: user.is_active },
+    user: {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      status: user.is_active,
+      companyName: userCompany?.name || null,
+    },
     token: accessToken, // Backward compatibility
     accessToken,
     refreshToken,

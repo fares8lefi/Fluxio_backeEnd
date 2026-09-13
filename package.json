@@ -41,7 +41,6 @@
     "jest": "^30.5.1",
     "prettier": "^3.9.6",
     "prisma": "^5.22.0",
-    "supertest": "^7.2.2",
-    "vercel": "59.16.0"
+    "supertest": "^7.2.2"
   }
 }

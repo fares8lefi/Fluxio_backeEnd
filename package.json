@@ -11,7 +11,8 @@
     "test": "jest",
     "e2e": "artillery run tests/artillerr.yml",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

@@ -1,7 +1,7 @@
 name: Database Deploy
 
-on :
-  push :
+on:
+  push:
     branches:
       - main
 env:
@@ -11,21 +11,21 @@ jobs:
     name: install code
     runs-on: ubuntu
     steps:
-      - name : checkout
+      - name: checkout
         uses: actions/checkout@v5
 
-      - name : setup node.js
-        uses : actions/setup-node@v5
+      - name: setup node.js
+        uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-      - name : install dependencies
-        run : npm ci
-      - name : generate prisma client
-        run : npx run generate
-      - name : run migration
-        run : npx prisma migrate deploy
+      - name: install dependencies
+        run: npm ci
+      - name: generate prisma client
+        run: npx run generate
+      - name: run migration
+        run: npx prisma migrate deploy
         env:
-          DATABASE_URL : ${{secrets.DATABASE_URL}}
+          DATABASE_URL: ${{secrets.DATABASE_URL}}
       - name: Migration completed
         run: echo "Database migration finished successfully"

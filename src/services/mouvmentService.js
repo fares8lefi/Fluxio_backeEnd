@@ -161,9 +161,18 @@ const cancelMouvment = async (mouvmentId, companyId) => {
 /**
  * Récupère les mouvements paginés avec filtres optionnels
  * Filtres supportés : type, status, clientId, supplierId, startDate, endDate
+ *
+ * @param {number|string} page
+ * @param {string} companyId
+ * @param {object} filters
+ * @param {number|string} [limitOverride] — taille de page optionnelle (ex: 5 pour
+ *   le journal du tableau de bord). Bornée à 100 ; sans effet si absent.
  */
-const getAllMouvments = async (page, companyId, filters = {}) => {
-  const limit = parseInt(process.env.limitByPage) || 10;
+const getAllMouvments = async (page, companyId, filters = {}, limitOverride) => {
+  const parsedLimit = parseInt(limitOverride, 10);
+  const limit = Number.isFinite(parsedLimit) && parsedLimit > 0
+    ? Math.min(parsedLimit, 100)
+    : parseInt(process.env.limitByPage) || 10;
   const numbrePage = parseInt(page) || 1;
 
   const mouvments = await mouvmentRepository.findPaginated(numbrePage, limit, companyId, filters);

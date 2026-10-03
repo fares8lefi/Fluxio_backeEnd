@@ -22,11 +22,11 @@ module.exports.createMouvment = async (req, res) => {
   }
 };
 
-// GET /api/mouvments/getAllMouvment?page=1&type=OUT&status=CONFIRMED&startDate=&endDate=
+// GET /api/mouvments/getAllMouvment?page=1&limit=5&type=OUT&status=CONFIRMED&startDate=&endDate=
 module.exports.getAllMouvment = async (req, res) => {
   try {
     const user = req.session && req.session.user ? req.session.user : req.user;
-    const { numbrePage, page, type, status, startDate, endDate, clientId, supplierId } = req.query;
+    const { numbrePage, page, limit, type, status, startDate, endDate, clientId, supplierId } = req.query;
 
     const filters = {};
     if (type) filters.type = type;
@@ -39,7 +39,8 @@ module.exports.getAllMouvment = async (req, res) => {
     const result = await mouvmentService.getAllMouvments(
       page || numbrePage,
       user.companyId,
-      filters
+      filters,
+      limit
     );
 
     return res.status(200).json({

@@ -60,4 +60,21 @@ describe('MouvmentService', () => {
       );
     });
   });
+
+  describe('getMouvmentsBySupplier', () => {
+    it('devrait retourner les mouvements d un fournisseur', async () => {
+      const mockMouvments = [{ id: 1, type: 'IN', supplierId: 'supplier-1' }];
+      mouvmentRepository.findBySupplierId.mockResolvedValue(mockMouvments);
+
+      const result = await mouvmentService.getMouvmentsBySupplier('supplier-1', 'company-id');
+      expect(result).toHaveProperty('mouvments');
+      expect(result).toHaveProperty('count', 1);
+    });
+
+    it('devrait lever une erreur si supplierId est manquant', async () => {
+      await expect(mouvmentService.getMouvmentsBySupplier(null, 'company-id')).rejects.toThrow(
+        'supplierId est requis'
+      );
+    });
+  });
 });

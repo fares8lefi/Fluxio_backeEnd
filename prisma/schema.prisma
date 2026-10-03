@@ -38,6 +38,21 @@ enum InvoiceStatus {
   CANCELLED
 }
 
+enum InvoiceType {
+  SALE
+  CREDIT_NOTE
+  PROFORMA
+}
+
+enum QuoteStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  CONVERTED
+}
+
 // ─────────────────────────────────────────
 // Models
 // ─────────────────────────────────────────
@@ -58,6 +73,7 @@ model Company {
   movements  Movement[]
   clients    Client[]
   invoices   Invoice[]
+  quotes     Quote[]
 }
 
 model User {
@@ -207,18 +223,44 @@ model Client {
   userId String?
   
   invoices Invoice[]
+  quotes   Quote[]
 }
-// Append Invoice model to schema
+
 model Invoice {
   id              String        @id @default(cuid())
   reference       String        @unique
   date            DateTime      @default(now())
+  
+  invoice_type    InvoiceType   @default(SALE)
   
   // Montants selon la norme tunisienne
   total_ht        Float
   tva_amount      Float
   timbre_fiscal   Float         @default(1.000) // Timbre fiscal tunisien actuel (1 DT)
   total_ttc       Float         // total_ht + tva_amount + timbre_fiscal
+
+  // Régime fiscal tunisien
+  is_suspended    Boolean       @default(false)  // Vente en suspension de TVA
+  attestation_ref String?                         // N° attestation fiscale suspension TVA
+  
+  // Retenue à la source tunisienne
+  apply_rs        Boolean       @default(false)
+  rs_rate         Float         @default(1.0)    // Taux RS: 1.0, 5.0, ou 15.0
+  rs_amount       Float         @default(0.0)    // Montant déduit
+  net_payable     Float?                         // TTC - RS
+  
+  // TVA ventilée par taux (JSON)
+  tva_breakdown   String?       @db.Text         // JSON: [{rate:7,base_ht:100,tva_amount:7}]
+  
+  // Référence bon de commande client
+  purchase_order_ref String?
+  
+  // Notes et conditions
+  notes           String?       @db.Text
+  payment_terms   String?                        // ex: "Paiement 30 jours"
+  
+  // Pour les avoirs : référence à la facture originale
+  original_invoice_id String?
   
   status          InvoiceStatus @default(PENDING)
   
@@ -230,4 +272,40 @@ model Invoice {
   
   company    Company  @relation(fields: [companyId], references: [id])
   companyId  String
+}
+
+model Quote {
+  id              String      @id @default(cuid())
+  reference       String      @unique
+  date            DateTime    @default(now())
+  valid_until     DateTime?                      // Date limite de validité
+  status          QuoteStatus @default(DRAFT)
+  
+  // Montants
+  total_ht        Float       @default(0)
+  tva_amount      Float       @default(0)
+  total_ttc       Float       @default(0)
+  
+  // Régime fiscal
+  is_suspended    Boolean     @default(false)
+  
+  // Notes et conditions
+  notes           String?     @db.Text
+  payment_terms   String?
+  
+  // Items du devis (JSON dénormalisé)
+  items           String      @db.Text  // JSON: [{productId,name,qty,unit_price,tva_rate}]
+  
+  // Références
+  client          Client?     @relation(fields: [clientId], references: [id])
+  clientId        String?
+  
+  company         Company     @relation(fields: [companyId], references: [id])
+  companyId       String
+  
+  // Si converti en facture
+  invoice_id      String?
+  
+  created_at      DateTime    @default(now())
+  updated_at      DateTime    @updatedAt
 }

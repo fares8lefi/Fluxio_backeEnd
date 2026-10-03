@@ -12,7 +12,7 @@ router.put('/updateProduct/:id', requireAuthUser, productController.updateProduc
 router.delete('/deleteProduct/:id', requireAuthUser, productController.deleteProduct);
 
 //get
-router.get('/getAllProduct', requireAuthUser, productController.getAllProduct);
+router.get('/getAllProducts', requireAuthUser, productController.getAllProduct);
 router.get('/getProductById/:id', requireAuthUser, productController.getProductById);
 router.get('/getProductByFiltres', requireAuthUser, productController.getProductByFiltres);
 router.get('/getProductsBySupplier', requireAuthUser, productController.getSuppliersByProduct);

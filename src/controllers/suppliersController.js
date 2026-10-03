@@ -52,10 +52,7 @@ module.exports.getActiveSuppliers = async function (req, res) {
   try {
     const companyId = (req.user || req.session?.user)?.companyId;
     const suppliers = await supplierService.getActiveSuppliers(companyId);
-    if (suppliers.length === 0) {
-      return res.status(404).json({ success: false, message: 'Aucun fournisseur actif trouvé' });
-    }
-    return res.status(200).json({ success: true, suppliers });
+    return res.status(200).json({ success: true, suppliers: suppliers || [] });
   } catch (error) {
     const statusCode = error.statusCode || 500;
     return res.status(statusCode).json({ success: false, message: error.message });
@@ -108,10 +105,7 @@ module.exports.getAllSuppliers = async function (req, res) {
   try {
     const companyId = (req.user || req.session?.user)?.companyId;
     const suppliers = await supplierService.getAllSuppliers(companyId);
-    if (suppliers.length === 0) {
-      return res.status(404).json({ success: false, message: 'Aucun fournisseur trouvé' });
-    }
-    return res.status(200).json({ success: true, suppliers });
+    return res.status(200).json({ success: true, suppliers: suppliers || [] });
   } catch (error) {
     const statusCode = error.statusCode || 500;
     return res.status(statusCode).json({ success: false, message: error.message });

@@ -24,6 +24,12 @@ const clientRegistrationSchema = z.object({
     .trim()
     .optional()
     .nullable(),
+
+  address: z
+    .string({ invalid_type_error: "L'adresse doit être une chaîne de caractères" })
+    .trim()
+    .optional()
+    .nullable(),
 });
 
 const clientUpdateSchema = z.object({
@@ -40,6 +46,12 @@ const clientUpdateSchema = z.object({
 
   // Correction : codeTva est une chaîne, pas un Float
   codeTva: z.string().trim().optional().nullable(),
+
+  address: z
+    .string({ invalid_type_error: "L'adresse doit être une chaîne de caractères" })
+    .trim()
+    .optional()
+    .nullable(),
 
   is_active: z.boolean().optional(),
 });

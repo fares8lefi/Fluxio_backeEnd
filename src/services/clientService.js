@@ -76,14 +76,10 @@ const getClientByID = async (id, companyId) => {
 };
 
 // Récupère tous les clients de la compagnie
+// REST convention : retourne 200 + [] si aucun client — jamais 404 pour une liste vide
 const getAllClients = async (companyId) => {
   const clients = await clientRepository.getAllClients(companyId);
-  if (!clients || clients.length === 0) {
-    const error = new Error('Aucun client trouvé');
-    error.statusCode = 404;
-    throw error;
-  }
-  return clients;
+  return clients ?? [];
 };
 
 // Recherche des clients par nom

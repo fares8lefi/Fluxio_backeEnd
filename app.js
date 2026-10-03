@@ -14,7 +14,9 @@ const mouvmentRouter = require('./src/routes/mouvmentRouter');
 const clientRouter = require('./src/routes/clientRouter');
 const companyRouter = require('./src/routes/companyRouter');
 const invoiceRouter = require('./src/routes/invoiceRouter');
+const quoteRouter = require('./src/routes/quoteRouter');
 const dashboardRouter = require('./src/routes/dashboardRouter');
+const managerRouter = require('./src/routes/managerRouter');
 const healthRouter = require('./src/routes/healthRouter');
 
 const app = express();
@@ -39,7 +41,7 @@ app.use(
   })
 );
 
-// app.use(express.static(path.join(__dirname, 'public')));
+
 
 app.use('/api/users', usersRouter); // test valid
 app.use('/api/categories', categorieRouter); // test valid
@@ -49,6 +51,8 @@ app.use('/api/mouvments', mouvmentRouter);
 app.use('/api/clients', clientRouter);
 app.use('/api/company', companyRouter); // test valid
 app.use('/api/invoices', invoiceRouter);
+app.use('/api/quotes', quoteRouter);
+app.use('/api/dashboard/manager', managerRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/health', healthRouter); // test valid
 

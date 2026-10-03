@@ -111,6 +111,69 @@ const countAll = async (companyId) => {
   return prisma.movement.count({ where: { companyId } });
 };
 
+// Construit le where des mouvements facturables (sorties non annulées)
+const buildInvoiceableWhere = (companyId, filters = {}) => {
+  const where = {
+    companyId,
+    type: 'OUT',
+    status: { not: 'CANCELLED' },
+  };
+
+  if (filters.movementId) where.id = filters.movementId;
+  if (filters.clientId) where.clientId = filters.clientId;
+  if (filters.onlyNotInvoiced) where.invoice = null;
+  if (filters.onlyInvoiced) where.invoice = { isNot: null };
+
+  if (filters.startDate || filters.endDate) {
+    where.created_at = {};
+    if (filters.startDate) where.created_at.gte = new Date(filters.startDate);
+    if (filters.endDate) where.created_at.lte = new Date(filters.endDate);
+  }
+
+  if (filters.search) {
+    where.OR = [
+      { reference: { contains: filters.search } },
+      { note: { contains: filters.search } },
+      { client: { name: { contains: filters.search } } },
+      { client: { matriculeFiscale: { contains: filters.search } } },
+    ];
+  }
+
+  return where;
+};
+
+/**
+ * Mouvements OUT candidates à la génération d'une facture de vente,
+ * avec la facture déjà liée (si elle existe) pour savoir ce qui reste à faire
+ */
+const findInvoiceableOutMovements = async (page, limit, companyId, filters = {}) => {
+  return prisma.movement.findMany({
+    where: buildInvoiceableWhere(companyId, filters),
+    skip: (page - 1) * limit,
+    take: limit,
+    orderBy: { created_at: 'desc' },
+    include: {
+      items: { include: { product: true } },
+      client: true,
+      invoice: { select: { id: true, reference: true, status: true, date: true } },
+      created_by: { select: { id: true, username: true } },
+    },
+  });
+};
+
+// Compte les mouvements facturables avec les mêmes filtres
+const countInvoiceableOutMovements = async (companyId, filters = {}) => {
+  return prisma.movement.count({ where: buildInvoiceableWhere(companyId, filters) });
+};
+
+// Rattache un client à un mouvement (utile quand le client est choisi via le formulaire)
+const attachClient = async (id, clientId, tx = prisma) => {
+  return tx.movement.update({
+    where: { id },
+    data: { clientId },
+  });
+};
+
 // Récupère un mouvement par ID avec ses items et produits
 const getById = async (id, companyId, tx = prisma) => {
   return tx.movement.findFirst({
@@ -138,4 +201,7 @@ module.exports = {
   updateStatus,
   findByClientId,
   findBySupplierId,
+  findInvoiceableOutMovements,
+  countInvoiceableOutMovements,
+  attachClient,
 };

@@ -20,7 +20,7 @@ router.patch(
   suppliersController.activatedSuppliersStatus
 );
 //get
-router.get('/getAllSuppliers', requireAuthUser, suppliersController.getAllSuppliers);
+router.get('/getAllSupplier', requireAuthUser, suppliersController.getAllSuppliers);
 router.get('/getActiveSuppliers', requireAuthUser, suppliersController.getActiveSuppliers);
 router.get('/searchSuppliersByName', requireAuthUser, suppliersController.searchSuppliersByName);
 router.get('/getSupplierById/:id', requireAuthUser, suppliersController.getSupplierById);

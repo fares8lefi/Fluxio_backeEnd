@@ -35,3 +35,28 @@ module.exports.getTopProducts = async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// GET /api/dashboard/stock-health
+module.exports.getStockHealth = async (req, res) => {
+  try {
+    const user = req.session && req.session.user ? req.session.user : req.user;
+    const data = await dashboardService.getStockHealth(user.companyId);
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// GET /api/dashboard/stock-history?productId=&days=30
+module.exports.getStockHistory = async (req, res) => {
+  try {
+    const user = req.session && req.session.user ? req.session.user : req.user;
+    const { productId, days } = req.query;
+    const data = await dashboardService.getStockHistory(user.companyId, productId, days);
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};

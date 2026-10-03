@@ -35,6 +35,7 @@ const getInvoiceByMovementId = async (movementId, companyId) => {
 const findPaginated = async (page, limit, companyId, filters = {}) => {
   const where = { companyId };
   if (filters.status) where.status = filters.status;
+  if (filters.invoice_type) where.invoice_type = filters.invoice_type;
   if (filters.clientId) where.clientId = filters.clientId;
   if (filters.startDate || filters.endDate) {
     where.date = {};
@@ -47,13 +48,17 @@ const findPaginated = async (page, limit, companyId, filters = {}) => {
     skip: (page - 1) * limit,
     take: limit,
     orderBy: { date: 'desc' },
-    include: { client: true },
+    include: {
+      client: true,
+      company: true,
+    },
   });
 };
 
 const countAll = async (companyId, filters = {}) => {
   const where = { companyId };
   if (filters.status) where.status = filters.status;
+  if (filters.invoice_type) where.invoice_type = filters.invoice_type;
   if (filters.clientId) where.clientId = filters.clientId;
   if (filters.startDate || filters.endDate) {
     where.date = {};
@@ -70,6 +75,26 @@ const updateStatus = async (id, status, companyId) => {
   });
 };
 
+/**
+ * Récupère le dernier numéro séquentiel pour une entreprise, année et préfixe (ex: FAC, AVO)
+ */
+const getLastReferenceNumber = async (companyId, year, prefix) => {
+  const pattern = `${prefix}-${year}-`;
+  const last = await prisma.invoice.findFirst({
+    where: {
+      companyId,
+      reference: { startsWith: pattern },
+    },
+    orderBy: { reference: 'desc' },
+    select: { reference: true },
+  });
+
+  if (!last || !last.reference) return 0;
+  const parts = last.reference.split('-');
+  const num = parseInt(parts[parts.length - 1], 10);
+  return isNaN(num) ? 0 : num;
+};
+
 module.exports = {
   createInvoice,
   getInvoiceById,
@@ -77,4 +102,5 @@ module.exports = {
   findPaginated,
   countAll,
   updateStatus,
+  getLastReferenceNumber,
 };

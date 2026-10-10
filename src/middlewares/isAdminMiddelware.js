@@ -10,6 +10,10 @@ const isAdmin = (req, res, next) => {
       return res.status(403).json({ message: 'Accès refusé : admin requis' });
     }
 
+    if (user.is_active === false) {
+      return res.status(403).json({ message: 'Compte admin suspendu' });
+    }
+
     next();
   } catch {
     return res.status(500).json({ message: 'Erreur middleware admin' });

@@ -6,6 +6,9 @@ const cors = require('cors');
 require('dotenv').config();
 const prisma = require('./config/db');
 
+const adminRouter = require('./src/routes/adminRouter');
+const { isActiveUser } = require('./src/middlewares/isActiveUser');
+
 const usersRouter = require('./src/routes/usersRouter');
 const categorieRouter = require('./src/routes/categorieRouter');
 const suppliersRouter = require('./src/routes/suppliersRouter');
@@ -41,7 +44,8 @@ app.use(
   })
 );
 
-
+// Middleware global : users suspendus → lecture seule (bloque POST/PUT/PATCH/DELETE)
+app.use(isActiveUser);
 
 app.use('/api/users', usersRouter); // test valid
 app.use('/api/categories', categorieRouter); // test valid
@@ -54,6 +58,7 @@ app.use('/api/invoices', invoiceRouter);
 app.use('/api/quotes', quoteRouter);
 app.use('/api/dashboard/manager', managerRouter);
 app.use('/api/dashboard', dashboardRouter);
+app.use('/api/admin', adminRouter);
 app.use('/health', healthRouter); // test valid
 
 app.use((req, res) => {

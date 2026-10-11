@@ -33,7 +33,7 @@ const createUser = async (data) => {
     throw error;
   }
 
-  const { username, password, phone, email, company_name, matriculeFiscale } = data;
+  const { username, password, phone, email, company_name, matriculeFiscale, role } = data;
 
   const existingUser = await userRepository.findOneByEmail(email);
   if (existingUser) {
@@ -57,6 +57,7 @@ const createUser = async (data) => {
       code,
       code_expires_at,
       is_active: false,
+      role: role === 'admin' ? 'admin' : 'user',
       companyId: company.id,
     }),
     sendEmailVerificationCode(email, username, code),

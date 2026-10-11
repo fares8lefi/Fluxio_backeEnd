@@ -32,6 +32,8 @@ const userRegistrationSchema = z.object({
     .string({ required_error: 'Tax identification number is required' })
     .trim()
     .min(1, 'Tax identification number is required'),
+
+  role: z.enum(['user', 'admin']).optional().default('user'),
 });
 
 const userUpdateSchema = z.object({

@@ -18,14 +18,12 @@ describe('Tunisian taxEngine Unit Tests', () => {
       expect(result.timbre_fiscal).toBe(1.0);
       expect(result.total_ttc).toBe(239);
       expect(result.net_payable).toBe(239);
-      expect(result.tva_breakdown).toEqual([
-        { rate: 19, base_ht: 200, tva_amount: 38 },
-      ]);
+      expect(result.tva_breakdown).toEqual([{ rate: 19, base_ht: 200, tva_amount: 38 }]);
     });
 
     it('should calculate multiple VAT tranches (7%, 19%) correctly', () => {
       const items = [
-        { unit_price: 100, quantity: 1, tva_rate: 7 },  // 100 HT -> 7 TVA
+        { unit_price: 100, quantity: 1, tva_rate: 7 }, // 100 HT -> 7 TVA
         { unit_price: 200, quantity: 1, tva_rate: 19 }, // 200 HT -> 38 TVA
       ];
       const result = calculateTotals(items);
@@ -38,9 +36,7 @@ describe('Tunisian taxEngine Unit Tests', () => {
     });
 
     it('should handle suspension of TVA regime (is_suspended: true)', () => {
-      const items = [
-        { unit_price: 1000, quantity: 1, tva_rate: 19 },
-      ];
+      const items = [{ unit_price: 1000, quantity: 1, tva_rate: 19 }];
       const result = calculateTotals(items, { is_suspended: true });
 
       expect(result.total_ht).toBe(1000);
@@ -85,16 +81,44 @@ describe('Tunisian taxEngine Unit Tests', () => {
     });
 
     it('should convert millimes correctly (e.g. 1.500 DT)', () => {
-      const words = amountToWords(1.500);
+      const words = amountToWords(1.5);
       expect(words.toLowerCase()).toContain('un dinar');
       expect(words.toLowerCase()).toContain('cinq cents millimes');
     });
 
     it('should convert large numbers with millimes (e.g. 1250.750 DT)', () => {
-      const words = amountToWords(1250.750);
+      const words = amountToWords(1250.75);
       expect(words.toLowerCase()).toContain('mille');
       expect(words.toLowerCase()).toContain('dinars');
       expect(words.toLowerCase()).toContain('millimes');
+    });
+
+    it.each([
+      [21, 'Vingt et un dinars'],
+      [71, 'Soixante et onze dinars'],
+      [80, 'Quatre-vingts dinars'],
+      [81, 'Quatre-vingt-un dinars'],
+      [200, 'Deux cents dinars'],
+      [203, 'Deux cent trois dinars'],
+      [80000, 'Quatre-vingt mille dinars'],
+      [200000, 'Deux cent mille dinars'],
+      [1191, 'Mille cent quatre-vingt-onze dinars'],
+      [2000000, 'Deux millions de dinars'],
+      [0.001, 'Un millime'],
+      [1250.75, 'Mille deux cent cinquante dinars et sept cent cinquante millimes'],
+    ])("applique les règles d'accord françaises (%s)", (amount, expected) => {
+      expect(amountToWords(amount)).toBe(expected);
+    });
+  });
+
+  describe('calculateTotals — remise', () => {
+    it('applique la remise ligne avant TVA', () => {
+      const result = calculateTotals([
+        { unit_price: 100, quantity: 2, tva_rate: 19, discount: 10 },
+      ]);
+      expect(result.total_ht).toBe(180);
+      expect(result.tva_amount).toBe(34.2);
+      expect(result.total_ttc).toBe(215.2);
     });
   });
 

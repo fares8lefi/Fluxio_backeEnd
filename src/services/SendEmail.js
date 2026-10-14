@@ -268,4 +268,44 @@ const sendEmailResetCode = async (email, username, code) => {
   }
 };
 
-module.exports = { sendEmailVerificationCode, sendEmailResetCode };
+const ROLE_LABELS = { OWNER: 'Gérant', STOCK: 'Magasinier', ACCOUNTANT: 'Comptable' };
+
+const escapeHtml = (text) =>
+  String(text).replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]
+  );
+
+/** Invitation à rejoindre une entreprise sur Fluxio */
+const sendInvitationEmail = async (email, { companyName, inviterName, role, link }) => {
+  try {
+    const roleLabel = ROLE_LABELS[role] ?? role;
+    await transporter.sendMail({
+      from: process.env.EmailUser,
+      to: email,
+      subject: `${inviterName} vous invite à rejoindre ${companyName} sur Fluxio`,
+      text: `Bonjour,
+
+${inviterName} vous invite à rejoindre ${companyName} sur Fluxio en tant que ${roleLabel}.
+
+Créez votre accès avec ce lien (valable 7 jours) :
+${link}
+
+Si vous n'attendiez pas cette invitation, ignorez cet e-mail.
+
+L'équipe Fluxio`,
+      html: `<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;color:#0f172a">
+  <h2 style="color:#0e7490">Invitation à rejoindre ${escapeHtml(companyName)}</h2>
+  <p><strong>${escapeHtml(inviterName)}</strong> vous invite à rejoindre <strong>${escapeHtml(companyName)}</strong> sur Fluxio en tant que <strong>${escapeHtml(roleLabel)}</strong>.</p>
+  <p style="margin:28px 0"><a href="${escapeHtml(link)}" style="background:#0e7490;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:bold">Créer mon accès</a></p>
+  <p style="font-size:12px;color:#64748b">Ce lien est valable 7 jours et ne peut servir qu'une fois. Si vous n'attendiez pas cette invitation, ignorez cet e-mail.</p>
+</div>`,
+    });
+    return true;
+  } catch (error) {
+    console.log(error);
+    return false;
+  }
+};
+
+module.exports = { sendEmailVerificationCode, sendEmailResetCode, sendInvitationEmail };

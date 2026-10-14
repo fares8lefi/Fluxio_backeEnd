@@ -1,4 +1,8 @@
 const prisma = require('../../config/db');
+
+// Statuts de facture : « ouverte » (reste à payer) et « avec encaissement »
+const OPEN_STATUSES = ['PENDING', 'PARTIALLY_PAID'];
+const PAID_STATUSES = ['PAID', 'PARTIALLY_PAID'];
 const { z } = require('zod');
 
 /* ────────────────────────────────────────────────────────────────────────────
@@ -49,8 +53,7 @@ const safeRatio = (part, total, digits = 2) =>
 const safeDivide = (part, total, digits = 3) =>
   Number(total) > 0 ? round(Number(part) / Number(total), digits) : 0;
 
-const sum = (rows, field) =>
-  rows.reduce((acc, row) => acc + (Number(row?.[field]) || 0), 0);
+const sum = (rows, field) => rows.reduce((acc, row) => acc + (Number(row?.[field]) || 0), 0);
 
 /* ────────────────────────────────── Cache ────────────────────────────────── */
 
@@ -80,8 +83,7 @@ const periodSchema = z.object({
   endDate: z.string().max(40).optional(),
 });
 
-const utcStartOfMonth = (date) =>
-  new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
+const utcStartOfMonth = (date) => new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
 
 const utcEndOfMonth = (date) =>
   new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0, 23, 59, 59, 999));
@@ -131,9 +133,7 @@ const resolvePeriod = (query = {}) => {
   });
 
   if (!parsed.success) {
-    throw httpError(
-      `Période invalide. Valeurs acceptées : ${PERIOD_KEYS.join(', ')}.`
-    );
+    throw httpError(`Période invalide. Valeurs acceptées : ${PERIOD_KEYS.join(', ')}.`);
   }
 
   const { period, startDate: rawStart, endDate: rawEnd } = parsed.data;
@@ -294,6 +294,7 @@ const loadSalesAnalytics = (companyId, from, to, cacheSuffix) =>
       select: {
         quantity: true,
         unit_price: true,
+        purchase_price: true,
         product: { select: { purchase_price: true, categoryId: true } },
       },
     });
@@ -306,7 +307,8 @@ const loadSalesAnalytics = (companyId, from, to, cacheSuffix) =>
     items.forEach((item) => {
       const quantity = Number(item.quantity) || 0;
       const lineTotal = quantity * (Number(item.unit_price) || 0);
-      const purchase = Number(item.product?.purchase_price) || 0;
+      // Prix d'achat figé sur la ligne (repli : fiche produit pour l'historique)
+      const purchase = Number(item.purchase_price ?? item.product?.purchase_price) || 0;
       const lineMargin = quantity * ((Number(item.unit_price) || 0) - purchase);
 
       revenueHt += lineTotal;
@@ -370,16 +372,29 @@ const buildKpiSet = async (companyId, from, to, cacheSuffix) => {
     await Promise.all([
       prisma.invoice.aggregate({
         where: saleScope,
-        _sum: { total_ht: true, total_ttc: true, tva_amount: true, rs_amount: true },
+        _sum: {
+          total_ht: true,
+          total_ttc: true,
+          tva_amount: true,
+          rs_amount: true,
+          net_payable: true,
+        },
       }),
+      // Encaissé = règlements réellement reçus (paiements partiels compris)
       prisma.invoice.aggregate({
-        where: invoiceRange(companyId, from, to, { invoice_type: 'SALE', status: 'PAID' }),
-        _sum: { total_ttc: true },
+        where: invoiceRange(companyId, from, to, {
+          invoice_type: 'SALE',
+          status: { in: PAID_STATUSES },
+        }),
+        _sum: { amount_paid: true },
       }),
       prisma.invoice.count({ where: saleScope }),
       prisma.invoice.aggregate({
-        where: invoiceRange(companyId, from, to, { invoice_type: 'SALE', status: 'PENDING' }),
-        _sum: { total_ttc: true },
+        where: invoiceRange(companyId, from, to, {
+          invoice_type: 'SALE',
+          status: { in: OPEN_STATUSES },
+        }),
+        _sum: { net_payable: true, amount_paid: true },
       }),
       prisma.movement.aggregate({
         where: movementRange(companyId, from, to, { type: 'IN' }),
@@ -390,7 +405,9 @@ const buildKpiSet = async (companyId, from, to, cacheSuffix) => {
     ]);
 
   const billedTtc = round(billed._sum.total_ttc);
-  const collectedTtc = round(collected._sum.total_ttc);
+  const collectedTtc = round(collected._sum.amount_paid);
+  // Le client règle le net à payer (TTC − retenue à la source)
+  const billedDue = round(billed._sum.net_payable ?? billed._sum.total_ttc);
 
   return {
     revenue_billed_ttc: billedTtc,
@@ -398,8 +415,8 @@ const buildKpiSet = async (companyId, from, to, cacheSuffix) => {
     tva_amount: round(billed._sum.tva_amount),
     rs_amount: round(billed._sum.rs_amount),
     revenue_collected: collectedTtc,
-    collection_rate_pct: safeRatio(collectedTtc, billedTtc),
-    outstanding_ttc: round(pending._sum.total_ttc),
+    collection_rate_pct: safeRatio(collectedTtc, billedDue),
+    outstanding_ttc: round((pending._sum.net_payable || 0) - (pending._sum.amount_paid || 0)),
     invoice_count: saleCount,
     average_basket: safeDivide(billedTtc, saleCount),
     margin_estimated: analytics.marginEstimated,
@@ -425,7 +442,12 @@ const getManagerKpis = async (companyId, query = {}) => {
   const data = await withCache(`kpis:${companyId}:${period.cacheKey}`, async () => {
     const [current, previous, snapshot] = await Promise.all([
       buildKpiSet(companyId, period.startDate, period.endDate, period.cacheKey),
-      buildKpiSet(companyId, period.previous.startDate, period.previous.endDate, `${period.cacheKey}:prev`),
+      buildKpiSet(
+        companyId,
+        period.previous.startDate,
+        period.previous.endDate,
+        `${period.cacheKey}:prev`
+      ),
       loadStockSnapshot(companyId),
     ]);
 
@@ -439,15 +461,12 @@ const getManagerKpis = async (companyId, query = {}) => {
         revenue_billed_ttc: withDelta(current.revenue_billed_ttc, previous.revenue_billed_ttc),
         revenue_billed_ht: withDelta(current.revenue_billed_ht, previous.revenue_billed_ht),
         revenue_collected: withDelta(current.revenue_collected, previous.revenue_collected),
-        collection_rate_pct: withDelta(
-          current.collection_rate_pct,
-          previous.collection_rate_pct
-        ),
+        collection_rate_pct: withDelta(current.collection_rate_pct, previous.collection_rate_pct),
         outstanding_ttc: withDelta(current.outstanding_ttc, previous.outstanding_ttc),
         invoice_count: withDelta(current.invoice_count, previous.invoice_count),
         average_basket: withDelta(current.average_basket, previous.average_basket),
         margin_estimated: withDelta(current.margin_estimated, previous.margin_estimated),
-        margin_estimated_note: 'Estimation — prix d’achat actuel du produit',
+        margin_estimated_note: 'Sur le prix d’achat au moment de la vente',
         sales_volume: withDelta(current.sales_volume, previous.sales_volume),
         purchase_total: withDelta(current.purchase_total, previous.purchase_total),
         stock_value_cost: { value: stockValueCost, previous: null, delta_pct: null },
@@ -477,53 +496,60 @@ const getManagerSales = async (companyId, query = {}) => {
   return withCache(`salesblock:${companyId}:${period.cacheKey}`, async () => {
     const trendStart = utcStartOfMonth(shiftMonth(period.startDate, -(TREND_MONTHS - 1)));
 
-    const [invoices, trendRows, topClients, notInvoicedCount, notInvoicedAgg] =
-      await Promise.all([
-        prisma.invoice.findMany({
-          where: invoiceRange(companyId, period.startDate, period.endDate),
-          select: {
-            date: true,
-            status: true,
-            invoice_type: true,
-            is_suspended: true,
-            total_ht: true,
-            total_ttc: true,
-            tva_amount: true,
-            timbre_fiscal: true,
-            rs_amount: true,
-            net_payable: true,
-            tva_breakdown: true,
-          },
+    const [invoices, trendRows, topClients, notInvoicedCount, notInvoicedAgg] = await Promise.all([
+      prisma.invoice.findMany({
+        where: invoiceRange(companyId, period.startDate, period.endDate),
+        select: {
+          date: true,
+          status: true,
+          invoice_type: true,
+          is_suspended: true,
+          total_ht: true,
+          total_ttc: true,
+          tva_amount: true,
+          timbre_fiscal: true,
+          rs_amount: true,
+          net_payable: true,
+          amount_paid: true,
+          tva_breakdown: true,
+        },
+      }),
+      prisma.invoice.findMany({
+        where: invoiceRange(companyId, trendStart, period.endDate, { invoice_type: 'SALE' }),
+        select: {
+          date: true,
+          status: true,
+          total_ht: true,
+          total_ttc: true,
+          tva_amount: true,
+          amount_paid: true,
+        },
+      }),
+      loadTopClients(companyId, period.startDate, period.endDate, period.cacheKey, 5),
+      prisma.movement.count({
+        where: movementRange(companyId, period.startDate, period.endDate, {
+          type: 'OUT',
+          invoice: null,
         }),
-        prisma.invoice.findMany({
-          where: invoiceRange(companyId, trendStart, period.endDate, { invoice_type: 'SALE' }),
-          select: { date: true, status: true, total_ht: true, total_ttc: true, tva_amount: true },
+      }),
+      prisma.movement.aggregate({
+        where: movementRange(companyId, period.startDate, period.endDate, {
+          type: 'OUT',
+          invoice: null,
         }),
-        loadTopClients(companyId, period.startDate, period.endDate, period.cacheKey, 5),
-        prisma.movement.count({
-          where: movementRange(companyId, period.startDate, period.endDate, {
-            type: 'OUT',
-            invoice: null,
-          }),
-        }),
-        prisma.movement.aggregate({
-          where: movementRange(companyId, period.startDate, period.endDate, {
-            type: 'OUT',
-            invoice: null,
-          }),
-          _sum: { total_amount: true },
-        }),
-      ]);
+        _sum: { total_amount: true },
+      }),
+    ]);
 
     const sales = invoices.filter((inv) => inv.invoice_type === 'SALE');
     const creditNotes = invoices.filter((inv) => inv.invoice_type === 'CREDIT_NOTE');
-    const pendingRows = sales.filter((inv) => inv.status === 'PENDING');
+    const pendingRows = sales.filter((inv) => OPEN_STATUSES.includes(inv.status));
+    // Reste à payer d'une facture ouverte
+    const remainingOf = (inv) =>
+      Math.max((Number(inv.net_payable ?? inv.total_ttc) || 0) - (Number(inv.amount_paid) || 0), 0);
 
     const billedTtc = sum(sales, 'total_ttc');
-    const collectedTtc = sum(
-      sales.filter((inv) => inv.status === 'PAID'),
-      'total_ttc'
-    );
+    const collectedTtc = sum(sales, 'amount_paid');
     const creditNotesTtc = sum(creditNotes, 'total_ttc');
     const suspendedTtc = sum(
       sales.filter((inv) => inv.is_suspended),
@@ -535,7 +561,7 @@ const getManagerSales = async (companyId, query = {}) => {
     const ageing = { lt_30: 0, '30_60': 0, gt_60: 0 };
     pendingRows.forEach((row) => {
       const days = Math.floor((now - new Date(row.date).getTime()) / 86400000);
-      const amount = Number(row.total_ttc) || 0;
+      const amount = remainingOf(row);
       if (days <= 30) ageing.lt_30 += amount;
       else if (days <= 60) ageing['30_60'] += amount;
       else ageing.gt_60 += amount;
@@ -574,7 +600,7 @@ const getManagerSales = async (companyId, query = {}) => {
       bucket.billed_ttc += Number(row.total_ttc) || 0;
       bucket.billed_ht += Number(row.total_ht) || 0;
       bucket.tva += Number(row.tva_amount) || 0;
-      if (row.status === 'PAID') bucket.collected_ttc += Number(row.total_ttc) || 0;
+      bucket.collected_ttc += Number(row.amount_paid) || 0;
     });
 
     return {
@@ -595,8 +621,8 @@ const getManagerSales = async (companyId, query = {}) => {
         credit_note_count: creditNotes.length,
       },
       collection: {
-        rate_pct: safeRatio(collectedTtc, billedTtc),
-        outstanding_ttc: round(sum(pendingRows, 'total_ttc')),
+        rate_pct: safeRatio(collectedTtc, sum(sales, 'net_payable') || billedTtc),
+        outstanding_ttc: round(pendingRows.reduce((acc, inv) => acc + remainingOf(inv), 0)),
         outstanding_invoice_count: pendingRows.length,
         ageing: {
           lt_30: round(ageing.lt_30),
@@ -652,11 +678,11 @@ const getManagerClients = async (companyId, query = {}) => {
         by: ['clientId'],
         where: invoiceRange(companyId, new Date(0), new Date(), {
           invoice_type: 'SALE',
-          status: 'PENDING',
+          status: { in: OPEN_STATUSES },
           clientId: { not: null },
           date: { lte: riskDate },
         }),
-        _sum: { total_ttc: true },
+        _sum: { net_payable: true, amount_paid: true },
         _min: { date: true },
       }),
       prisma.invoice.aggregate({
@@ -693,7 +719,7 @@ const getManagerClients = async (companyId, query = {}) => {
           return {
             id: row.clientId,
             name: names.get(row.clientId) ?? 'Client supprimé',
-            outstanding_ttc: round(row._sum.total_ttc),
+            outstanding_ttc: round((row._sum.net_payable || 0) - (row._sum.amount_paid || 0)),
             oldest_invoice_date: oldest ? new Date(oldest).toISOString() : null,
             days_overdue: daysOverdue,
           };
@@ -738,51 +764,58 @@ const getManagerStock = async (companyId, query = {}) => {
   return withCache(`stockblock:${companyId}:${period.cacheKey}`, async () => {
     const last30 = addDays(new Date(), -30);
 
-    const [snapshot, purchases, supplierReturns, clientReturns, soldGroups, dailySales, topSuppliers] =
-      await Promise.all([
-        loadStockSnapshot(companyId),
-        prisma.movement.aggregate({
-          where: movementRange(companyId, period.startDate, period.endDate, { type: 'IN' }),
-          _sum: { total_amount: true },
-          _count: { _all: true },
+    const [
+      snapshot,
+      purchases,
+      supplierReturns,
+      clientReturns,
+      soldGroups,
+      dailySales,
+      topSuppliers,
+    ] = await Promise.all([
+      loadStockSnapshot(companyId),
+      prisma.movement.aggregate({
+        where: movementRange(companyId, period.startDate, period.endDate, { type: 'IN' }),
+        _sum: { total_amount: true },
+        _count: { _all: true },
+      }),
+      prisma.movement.aggregate({
+        where: movementRange(companyId, period.startDate, period.endDate, {
+          type: 'RETURN_SUPPLIER',
         }),
-        prisma.movement.aggregate({
-          where: movementRange(companyId, period.startDate, period.endDate, {
-            type: 'RETURN_SUPPLIER',
-          }),
-          _sum: { total_amount: true },
-          _count: { _all: true },
+        _sum: { total_amount: true },
+        _count: { _all: true },
+      }),
+      prisma.movement.aggregate({
+        where: movementRange(companyId, period.startDate, period.endDate, {
+          type: 'RETURN_CLIENT',
         }),
-        prisma.movement.aggregate({
-          where: movementRange(companyId, period.startDate, period.endDate, {
-            type: 'RETURN_CLIENT',
-          }),
-          _sum: { total_amount: true },
-          _count: { _all: true },
+        _sum: { total_amount: true },
+        _count: { _all: true },
+      }),
+      prisma.movementItem.groupBy({
+        by: ['productId'],
+        where: { movement: movementRange(companyId, new Date(0), new Date(), { type: 'OUT' }) },
+        _sum: { quantity: true },
+      }),
+      prisma.movementItem.aggregate({
+        where: {
+          movement: movementRange(companyId, last30, new Date(), { type: 'OUT' }),
+        },
+        _sum: { quantity: true },
+      }),
+      prisma.movement.groupBy({
+        by: ['supplierId'],
+        where: movementRange(companyId, period.startDate, period.endDate, {
+          type: 'IN',
+          supplierId: { not: null },
         }),
-        prisma.movementItem.groupBy({
-          by: ['productId'],
-          where: { movement: movementRange(companyId, new Date(0), new Date(), { type: 'OUT' }) },
-          _sum: { quantity: true },
-        }),
-        prisma.movementItem.aggregate({
-          where: {
-            movement: movementRange(companyId, last30, new Date(), { type: 'OUT' }),
-          },
-          _sum: { quantity: true },
-        }),
-        prisma.movement.groupBy({
-          by: ['supplierId'],
-          where: movementRange(companyId, period.startDate, period.endDate, {
-            type: 'IN',
-            supplierId: { not: null },
-          }),
-          _sum: { total_amount: true },
-          _count: { _all: true },
-          orderBy: { _sum: { total_amount: 'desc' } },
-          take: 5,
-        }),
-      ]);
+        _sum: { total_amount: true },
+        _count: { _all: true },
+        orderBy: { _sum: { total_amount: 'desc' } },
+        take: 5,
+      }),
+    ]);
 
     const analytics = await loadSalesAnalytics(
       companyId,
@@ -858,7 +891,10 @@ const getManagerStock = async (companyId, query = {}) => {
         const stock = stockByCategory.get(key) ?? { cost_value: 0, product_count: 0 };
         const sales = analytics.byCategory.get(key) ?? { sales_ht: 0, margin: 0 };
         return {
-          category: key === 'uncategorized' ? 'Sans catégorie' : snapshot.categoryNames.get(key) || 'Catégorie supprimée',
+          category:
+            key === 'uncategorized'
+              ? 'Sans catégorie'
+              : snapshot.categoryNames.get(key) || 'Catégorie supprimée',
           stock_cost_value: round(stock.cost_value),
           product_count: stock.product_count,
           sales_ht: round(sales.sales_ht),
@@ -934,53 +970,74 @@ const getManagerActivity = async (companyId, query = {}) => {
   return withCache(`activity:${companyId}:${period.cacheKey}`, async () => {
     const trendStart = utcStartOfMonth(shiftMonth(period.startDate, -(TREND_MONTHS - 1)));
 
-    const [byType, cancelled, movementRows, saleLines, quotesAgg, convertedQuotes, salesWithoutClient, salesWithoutClientAgg, invoicesWithoutClient, clientsMissingMatricule, invalidTvaRates] =
-      await Promise.all([
-        prisma.movement.groupBy({
-          by: ['type'],
-          where: movementRange(companyId, period.startDate, period.endDate),
-          _count: { _all: true },
+    const [
+      byType,
+      cancelled,
+      movementRows,
+      saleLines,
+      quotesAgg,
+      convertedQuotes,
+      salesWithoutClient,
+      salesWithoutClientAgg,
+      invoicesWithoutClient,
+      clientsMissingMatricule,
+      invalidTvaRates,
+    ] = await Promise.all([
+      prisma.movement.groupBy({
+        by: ['type'],
+        where: movementRange(companyId, period.startDate, period.endDate),
+        _count: { _all: true },
+      }),
+      prisma.movement.count({
+        where: {
+          companyId,
+          created_at: { gte: period.startDate, lte: period.endDate },
+          status: 'CANCELLED',
+        },
+      }),
+      prisma.movement.findMany({
+        where: { companyId, created_at: { gte: trendStart, lte: period.endDate } },
+        select: { created_at: true, total_amount: true, type: true },
+      }),
+      prisma.movementItem.findMany({
+        where: {
+          movement: movementRange(companyId, period.startDate, period.endDate, { type: 'OUT' }),
+        },
+        select: { quantity: true, unit_price: true, product: { select: { name: true } } },
+      }),
+      prisma.quote.aggregate({
+        where: { companyId, created_at: { gte: period.startDate, lte: period.endDate } },
+        _sum: { total_ttc: true },
+        _count: { _all: true },
+      }),
+      prisma.quote.count({
+        where: {
+          companyId,
+          status: 'CONVERTED',
+          created_at: { gte: period.startDate, lte: period.endDate },
+        },
+      }),
+      prisma.movement.count({
+        where: movementRange(companyId, period.startDate, period.endDate, {
+          type: 'OUT',
+          clientId: null,
         }),
-        prisma.movement.count({
-          where: { companyId, created_at: { gte: period.startDate, lte: period.endDate }, status: 'CANCELLED' },
+      }),
+      prisma.movement.aggregate({
+        where: movementRange(companyId, period.startDate, period.endDate, {
+          type: 'OUT',
+          clientId: null,
         }),
-        prisma.movement.findMany({
-          where: { companyId, created_at: { gte: trendStart, lte: period.endDate } },
-          select: { created_at: true, total_amount: true, type: true },
-        }),
-        prisma.movementItem.findMany({
-          where: { movement: movementRange(companyId, period.startDate, period.endDate, { type: 'OUT' }) },
-          select: { quantity: true, unit_price: true, product: { select: { name: true } } },
-        }),
-        prisma.quote.aggregate({
-          where: { companyId, created_at: { gte: period.startDate, lte: period.endDate } },
-          _sum: { total_ttc: true },
-          _count: { _all: true },
-        }),
-        prisma.quote.count({
-          where: { companyId, status: 'CONVERTED', created_at: { gte: period.startDate, lte: period.endDate } },
-        }),
-        prisma.movement.count({
-          where: movementRange(companyId, period.startDate, period.endDate, {
-            type: 'OUT',
-            clientId: null,
-          }),
-        }),
-        prisma.movement.aggregate({
-          where: movementRange(companyId, period.startDate, period.endDate, {
-            type: 'OUT',
-            clientId: null,
-          }),
-          _sum: { total_amount: true },
-        }),
-        prisma.invoice.count({
-          where: invoiceRange(companyId, period.startDate, period.endDate, { clientId: null }),
-        }),
-        prisma.client.count({ where: { companyId, matriculeFiscale: '' } }),
-        prisma.product.count({
-          where: { companyId, NOT: { tva_rate: { in: [0, 7, 13, 19] } } },
-        }),
-      ]);
+        _sum: { total_amount: true },
+      }),
+      prisma.invoice.count({
+        where: invoiceRange(companyId, period.startDate, period.endDate, { clientId: null }),
+      }),
+      prisma.client.count({ where: { companyId, matriculeFiscale: '' } }),
+      prisma.product.count({
+        where: { companyId, NOT: { tva_rate: { in: [0, 7, 13, 19] } } },
+      }),
+    ]);
 
     const types = { IN: 0, OUT: 0, RETURN_SUPPLIER: 0, RETURN_CLIENT: 0 };
     byType.forEach((row) => {

@@ -5,7 +5,7 @@
  * Retenue à la source : 1% (marchandises ≥1000 DT), 5%, 15% (services/honoraires)
  */
 
-const TIMBRE_FISCAL = 1.000;
+const TIMBRE_FISCAL = 1.0;
 const VALID_TVA_RATES = [0, 7, 13, 19];
 const VALID_RS_RATES = [1.0, 5.0, 15.0];
 
@@ -25,7 +25,9 @@ const calculateTotals = (items = [], options = {}) => {
     const qty = Number(item.quantity) || 0;
     const price = Number(item.unit_price) || 0;
     const rate = VALID_TVA_RATES.includes(Number(item.tva_rate)) ? Number(item.tva_rate) : 19;
-    const lineHT = parseFloat((price * qty).toFixed(3));
+    // Remise ligne en % (devis) — bornée à [0, 100]
+    const discount = Math.min(Math.max(Number(item.discount) || 0, 0), 100);
+    const lineHT = parseFloat((price * qty * (1 - discount / 100)).toFixed(3));
     total_ht += lineHT;
 
     if (!tvaGroups[rate]) {
@@ -73,75 +75,113 @@ const calculateTotals = (items = [], options = {}) => {
   };
 };
 
+const ONES = [
+  'zéro',
+  'un',
+  'deux',
+  'trois',
+  'quatre',
+  'cinq',
+  'six',
+  'sept',
+  'huit',
+  'neuf',
+  'dix',
+  'onze',
+  'douze',
+  'treize',
+  'quatorze',
+  'quinze',
+  'seize',
+  'dix-sept',
+  'dix-huit',
+  'dix-neuf',
+];
+const TENS = ['', '', 'vingt', 'trente', 'quarante', 'cinquante', 'soixante'];
+
+/**
+ * 0–99 en lettres
+ * @param {boolean} final — rien ne suit (« quatre-vingts » prend alors un s)
+ */
+const below100 = (n, final) => {
+  if (n < 20) return ONES[n];
+  const t = Math.floor(n / 10);
+  const o = n % 10;
+  if (t <= 6) {
+    if (o === 0) return TENS[t];
+    return TENS[t] + (o === 1 ? ' et un' : '-' + ONES[o]);
+  }
+  if (t === 7) return 'soixante' + (o === 1 ? ' et onze' : '-' + ONES[10 + o]);
+  // 80–99 : « quatre-vingt-un », jamais « et un »
+  if (n === 80) return final ? 'quatre-vingts' : 'quatre-vingt';
+  return 'quatre-vingt-' + ONES[n - 80];
+};
+
+/** 0–999 en lettres (« deux cents » mais « deux cent trois ») */
+const below1000 = (n, final) => {
+  const h = Math.floor(n / 100);
+  const rest = n % 100;
+  const parts = [];
+  if (h === 1) parts.push('cent');
+  else if (h > 1) parts.push(ONES[h] + ' cent' + (rest === 0 && final ? 's' : ''));
+  if (rest > 0) parts.push(below100(rest, final));
+  return parts.join(' ');
+};
+
+/** Entier positif en lettres, jusqu'aux milliards */
+const integerToWords = (n) => {
+  if (n === 0) return 'zéro';
+  const parts = [];
+  const scales = [
+    [1e9, 'milliard'],
+    [1e6, 'million'],
+  ];
+  for (const [size, noun] of scales) {
+    const count = Math.floor(n / size);
+    if (count > 0) {
+      // milliard/million sont des noms : ils s'accordent, le nombre devant aussi
+      parts.push(below1000(count, true) + ' ' + noun + (count > 1 ? 's' : ''));
+      n %= size;
+    }
+  }
+  const thousands = Math.floor(n / 1000);
+  if (thousands > 0) {
+    // « mille » est invariable et rend le nombre qui précède non final
+    parts.push(thousands === 1 ? 'mille' : below1000(thousands, false) + ' mille');
+    n %= 1000;
+  }
+  if (n > 0) parts.push(below1000(n, true));
+  return parts.join(' ');
+};
+
 /**
  * Convertit un montant en toutes lettres (Dinars Tunisiens et millimes)
+ * ex : 1250.75 → « Mille deux cent cinquante dinars et sept cent cinquante millimes »
  * @param {number} amount
  * @returns {string}
  */
 const amountToWords = (amount) => {
-  const ones = [
-    '', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf',
-    'dix', 'onze', 'douze', 'treize', 'quatorze', 'quinze', 'seize',
-    'dix-sept', 'dix-huit', 'dix-neuf'
-  ];
-  const tens = [
-    '', 'dix', 'vingt', 'trente', 'quarante', 'cinquante',
-    'soixante', 'soixante-dix', 'quatre-vingt', 'quatre-vingt-dix'
-  ];
-
-  const convertHundreds = (n) => {
-    if (n === 0) return '';
-    if (n < 20) return ones[n];
-    if (n < 100) {
-      const t = Math.floor(n / 10);
-      const o = n % 10;
-      if (t === 7 || t === 9) {
-        return tens[t - 1] + (o > 0 ? '-' + ones[10 + o] : '-dix');
-      }
-      if (t === 8) {
-        return 'quatre-vingt' + (o > 0 ? '-' + ones[o] : 's');
-      }
-      return tens[t] + (o > 0 ? (o === 1 && t !== 8 ? ' et un' : '-' + ones[o]) : '');
-    }
-    const h = Math.floor(n / 100);
-    const rem = n % 100;
-    const hStr = h === 1 ? 'cent' : ones[h] + ' cents';
-    return hStr + (rem > 0 ? ' ' + convertHundreds(rem) : '');
-  };
-
-  const convertBlock = (n) => {
-    if (n === 0) return '';
-    if (n < 1000) return convertHundreds(n);
-
-    const thousands = Math.floor(n / 1000);
-    const rem = n % 1000;
-    const thouStr = thousands === 1 ? 'mille' : convertHundreds(thousands) + ' mille';
-    return thouStr + (rem > 0 ? ' ' + convertHundreds(rem) : '');
-  };
-
-  const absAmount = Math.abs(amount || 0);
-  const rounded = Math.round(absAmount * 1000);
+  const rounded = Math.round(Math.abs(amount || 0) * 1000);
   const dinars = Math.floor(rounded / 1000);
   const millimes = rounded % 1000;
 
   if (dinars === 0 && millimes === 0) return 'Zéro dinar';
 
-  let result = '';
+  const parts = [];
   if (dinars > 0) {
-    result = convertBlock(dinars);
-    result += dinars > 1 ? ' dinars' : ' dinar';
+    // « un million de dinars », « deux millions de dinars »
+    const roundScale = dinars >= 1e6 && dinars % 1e6 === 0;
+    parts.push(
+      integerToWords(dinars) + (roundScale ? ' de' : '') + (dinars > 1 ? ' dinars' : ' dinar')
+    );
   }
-
   if (millimes > 0) {
-    const millimesStr = convertHundreds(millimes);
-    result += (dinars > 0 ? ' et ' : '') + millimesStr + ' millimes';
+    parts.push(integerToWords(millimes) + (millimes > 1 ? ' millimes' : ' millime'));
   }
 
-  if (amount < 0) {
-    result = 'Moins ' + result;
-  }
-
-  return result.charAt(0).toUpperCase() + result.slice(1).trim();
+  let result = parts.join(' et ');
+  if (amount < 0) result = 'moins ' + result;
+  return result.charAt(0).toUpperCase() + result.slice(1);
 };
 
 /**

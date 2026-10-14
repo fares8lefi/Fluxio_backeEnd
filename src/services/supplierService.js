@@ -1,9 +1,14 @@
 // Logique métier des fournisseurs : validation, vérification d'existence et délégation au repository.
 const supplierRepository = require('../repositories/supplierRepository');
+
 const {
   validateSupplierRegistration,
   validateSupplierUpdate,
 } = require('../validations/SuppliersValidations');
+const { normalizeMatricule: normalizeMf } = require('./companyService');
+
+// MF vide → null ; sinon majuscules sans espaces (format déjà validé par Zod)
+const normalizeMatricule = (mf) => (mf ? normalizeMf(mf) : null);
 
 // Crée un fournisseur avec validation
 const addSupplier = async (data, companyId) => {
@@ -16,7 +21,15 @@ const addSupplier = async (data, companyId) => {
   }
 
   const { name, code, email, phone, address } = data;
-  return await supplierRepository.create({ name, code, email, phone, address, companyId });
+  return await supplierRepository.create({
+    name,
+    code,
+    email,
+    phone,
+    address,
+    matriculeFiscale: normalizeMatricule(data.matriculeFiscale),
+    companyId,
+  });
 };
 
 // Met à jour un fournisseur avec validation
@@ -43,6 +56,8 @@ const updateSupplier = async (id, data, companyId) => {
   if (email !== undefined) updates.email = email;
   if (phone !== undefined) updates.phone = phone;
   if (address !== undefined) updates.address = address;
+  if (data.matriculeFiscale !== undefined)
+    updates.matriculeFiscale = normalizeMatricule(data.matriculeFiscale);
 
   return await supplierRepository.update(id, updates);
 };

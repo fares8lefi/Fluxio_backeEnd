@@ -1,4 +1,5 @@
 const { z } = require('zod');
+const { MF_PATTERN } = require('../services/companyService');
 
 // ─── Schemas ────────────────────────────────────────────────────────────────
 
@@ -14,6 +15,15 @@ const supplierRegistrationSchema = z.object({
   phone: z.string({ required_error: 'Phone is required' }).trim().min(1, 'Phone is required'),
 
   address: z.string({ required_error: 'Address is required' }).trim().min(1, 'Address is required'),
+
+  // Facultatif ; s'il est saisi, format tunisien (ex. 1234567A/A/M/000)
+  matriculeFiscale: z
+    .string()
+    .trim()
+    .transform((v) => v.replace(/\s/g, '').toUpperCase())
+    .refine((v) => v === '' || MF_PATTERN.test(v), 'Format attendu : 1234567A/A/M/000')
+    .optional()
+    .nullable(),
 });
 
 const supplierUpdateSchema = z.object({
@@ -24,6 +34,15 @@ const supplierUpdateSchema = z.object({
   phone: z.string().trim().min(1, 'Phone is required if provided').optional(),
 
   address: z.string().trim().min(1, 'Address is required if provided').optional(),
+
+  // Facultatif ; s'il est saisi, format tunisien (ex. 1234567A/A/M/000)
+  matriculeFiscale: z
+    .string()
+    .trim()
+    .transform((v) => v.replace(/\s/g, '').toUpperCase())
+    .refine((v) => v === '' || MF_PATTERN.test(v), 'Format attendu : 1234567A/A/M/000')
+    .optional()
+    .nullable(),
 });
 
 // ─── Helper ──────────────────────────────────────────────────────────────────

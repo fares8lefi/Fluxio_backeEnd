@@ -55,6 +55,15 @@ const mouvmentRegistrationSchema = z.object({
   reference: z.string().trim().optional().nullable(),
 
   note: z.string().trim().optional().nullable(),
+
+  // Entrée de stock : facture du fournisseur (traçabilité, TVA déductible)
+  supplier_invoice_ref: z.string().trim().max(100).optional().nullable(),
+  supplier_invoice_date: z
+    .string()
+    .trim()
+    .refine((v) => v === '' || !Number.isNaN(Date.parse(v)), 'Date de facture invalide')
+    .optional()
+    .nullable(),
 });
 
 const mouvmentUpdateSchema = z.object({

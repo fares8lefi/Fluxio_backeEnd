@@ -21,6 +21,8 @@ const create = async (data, tx = prisma) => {
         create: items.map((item) => ({
           quantity: item.quantity,
           unit_price: item.unit_price ?? 0,
+          tva_rate: item.tva_rate ?? null,
+          purchase_price: item.purchase_price ?? null,
           product: { connect: { id: item.productId } },
         })),
       },

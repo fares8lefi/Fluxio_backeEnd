@@ -2,14 +2,20 @@ const express = require('express');
 const router = express.Router();
 const productController = require('../controllers/productController');
 const { requireAuthUser } = require('../middlewares/authMiddelwares');
+const { canWriteStock } = require('../middlewares/companyRole');
 
 //post
-router.post('/addProduct', requireAuthUser, productController.addProduct);
+router.post('/addProduct', requireAuthUser, canWriteStock, productController.addProduct);
 
 //put
-router.put('/updateProduct/:id', requireAuthUser, productController.updateProduct);
+router.put('/updateProduct/:id', requireAuthUser, canWriteStock, productController.updateProduct);
 //delete
-router.delete('/deleteProduct/:id', requireAuthUser, productController.deleteProduct);
+router.delete(
+  '/deleteProduct/:id',
+  requireAuthUser,
+  canWriteStock,
+  productController.deleteProduct
+);
 
 //get
 router.get('/getAllProducts', requireAuthUser, productController.getAllProduct);

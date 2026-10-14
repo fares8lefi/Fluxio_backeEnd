@@ -1,12 +1,28 @@
 const prisma = require('../../config/db');
 
+/**
+ * Variation de stock signée d'une ligne de mouvement.
+ * Les ajustements (inventaire, casse…) portent déjà une quantité signée.
+ */
+const stockDelta = (item) => {
+  switch (item.movement.type) {
+    case 'IN':
+    case 'RETURN_CLIENT':
+      return item.quantity;
+    case 'ADJUSTMENT':
+      return item.quantity;
+    default:
+      return -item.quantity; // OUT, RETURN_SUPPLIER
+  }
+};
+
 const getDashboardSummary = async (companyId) => {
-  // 1. Chiffre d'affaires total (factures payées)
-  const paidInvoices = await prisma.invoice.aggregate({
-    where: { companyId, status: 'PAID' },
+  // 1. Chiffre d'affaires facturé (factures de vente non annulées, payées ou non)
+  const billedInvoices = await prisma.invoice.aggregate({
+    where: { companyId, invoice_type: 'SALE', status: { not: 'CANCELLED' } },
     _sum: { total_ttc: true },
   });
-  const totalRevenue = paidInvoices._sum.total_ttc || 0;
+  const totalRevenue = billedInvoices._sum.total_ttc || 0;
 
   // 2. Nombre total de ventes (mouvements OUT)
   const totalSales = await prisma.movement.count({
@@ -54,7 +70,8 @@ const getDashboardRevenue = async (companyId, period = 'month') => {
   const result = await prisma.invoice.aggregate({
     where: {
       companyId,
-      status: 'PAID',
+      invoice_type: 'SALE',
+      status: { not: 'CANCELLED' },
       date: { gte: startDate, lte: now },
     },
     _sum: { total_ttc: true, total_ht: true, tva_amount: true },
@@ -236,8 +253,7 @@ const getStockHistory = async (companyId, productId, days = 30) => {
 
   let netChangeInWindow = 0;
   movementItems.forEach((item) => {
-    const isIncrease = item.movement.type === 'IN' || item.movement.type === 'RETURN_CLIENT';
-    netChangeInWindow += isIncrease ? item.quantity : -item.quantity;
+    netChangeInWindow += stockDelta(item);
   });
 
   let runningStock = Math.max(0, targetProduct.stock_quantity - netChangeInWindow);
@@ -261,13 +277,11 @@ const getStockHistory = async (companyId, productId, days = 30) => {
 
   movementItems.forEach((item) => {
     const dateKey = item.movement.created_at.toISOString().split('T')[0];
-    const isIncrease = item.movement.type === 'IN' || item.movement.type === 'RETURN_CLIENT';
-    if (isIncrease) {
-      runningStock += item.quantity;
-      if (historyMap[dateKey]) historyMap[dateKey].entree += item.quantity;
-    } else {
-      runningStock = Math.max(0, runningStock - item.quantity);
-      if (historyMap[dateKey]) historyMap[dateKey].sortie += item.quantity;
+    const delta = stockDelta(item);
+    runningStock = Math.max(0, runningStock + delta);
+    if (historyMap[dateKey]) {
+      if (delta > 0) historyMap[dateKey].entree += delta;
+      else historyMap[dateKey].sortie += -delta;
     }
 
     if (historyMap[dateKey]) {

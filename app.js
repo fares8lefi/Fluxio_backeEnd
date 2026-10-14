@@ -3,7 +3,18 @@ const cookieParser = require('cookie-parser');
 const logger = require('morgan');
 const session = require('express-session');
 const cors = require('cors');
+const helmet = require('helmet');
 require('dotenv').config();
+
+// En production, refuser de démarrer avec des secrets absents ou par défaut
+if (process.env.NODE_ENV === 'production') {
+  const missing = ['net_Secret', 'SESSION_SECRET'].filter(
+    (key) => !process.env[key] || process.env[key] === 'default_session_secret'
+  );
+  if (missing.length > 0) {
+    throw new Error(`Secrets manquants en production : ${missing.join(', ')}`);
+  }
+}
 const prisma = require('./config/db');
 
 const adminRouter = require('./src/routes/adminRouter');
@@ -21,14 +32,26 @@ const quoteRouter = require('./src/routes/quoteRouter');
 const dashboardRouter = require('./src/routes/dashboardRouter');
 const managerRouter = require('./src/routes/managerRouter');
 const healthRouter = require('./src/routes/healthRouter');
+const exportRouter = require('./src/routes/exportRouter');
+const teamRouter = require('./src/routes/teamRouter');
 
 const app = express();
+
+// Derrière un proxy (Vercel, Nginx…) : l'IP réelle sert aux limites de débit
+if (process.env.TRUST_PROXY) app.set('trust proxy', Number(process.env.TRUST_PROXY) || 1);
+
+// En-têtes de sécurité HTTP (API JSON : pas de CSP de page nécessaire)
+app.use(
+  helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: { policy: 'cross-origin' } })
+);
 
 app.use(logger('dev'));
 app.use(
   cors({
-    origin: (process.env.FRONTEND_URL || 'http://localhost:5173').split(','),
+    origin: (process.env.FRONTEND_URL || 'http://localhost:5174').split(','),
     credentials: true,
+    // Nom de fichier des exports CSV lisible par le navigateur
+    exposedHeaders: ['Content-Disposition'],
   })
 );
 app.use(express.json());
@@ -40,7 +63,7 @@ app.use(
     secret: process.env.SESSION_SECRET || 'default_session_secret',
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: false },
+    cookie: { secure: process.env.NODE_ENV === 'production', httpOnly: true, sameSite: 'lax' },
   })
 );
 
@@ -59,6 +82,8 @@ app.use('/api/quotes', quoteRouter);
 app.use('/api/dashboard/manager', managerRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api/exports', exportRouter);
+app.use('/api/team', teamRouter);
 app.use('/health', healthRouter); // test valid
 
 app.use((req, res) => {

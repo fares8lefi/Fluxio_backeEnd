@@ -2,11 +2,9 @@ const invoiceRepository = require('../repositories/invoiceRepository');
 const mouvmentRepository = require('../repositories/mouvmentRepository');
 const clientRepository = require('../repositories/clientRepository');
 const companyRepository = require('../repositories/companyRepository');
+const companyService = require('./companyService');
 const { calculateTotals, amountToWords, generateReference } = require('../utils/taxEngine');
-const {
-  computeInvoiceReadiness,
-  getCompanyMissingFields,
-} = require('../utils/invoiceReadiness');
+const { computeInvoiceReadiness, getCompanyMissingFields } = require('../utils/invoiceReadiness');
 const {
   validateClientRegistration,
   validateClientUpdate,
@@ -86,8 +84,9 @@ const completeCompany = async (companyId, options = {}) => {
   if (!company) throw buildHttpError('Entreprise introuvable', 404);
   if (!patch) return company;
 
-  await companyRepository.update(companyId, patch);
-  return { ...company, ...patch };
+  // Même validation que la page Paramètres (format du MF, champs vides…)
+  const updated = await companyService.updateMyCompany(companyId, patch);
+  return { ...company, ...updated };
 };
 
 /**
@@ -102,7 +101,7 @@ const buildInvoiceCandidate = (movement, company) => {
     unitOfMeasure: item.product?.unit_of_measure || null,
     quantity: item.quantity,
     unit_price: item.unit_price,
-    tva_rate: item.product?.tva_rate ?? 19,
+    tva_rate: item.tva_rate ?? item.product?.tva_rate ?? 19,
     total_ht: parseFloat((Number(item.quantity) * Number(item.unit_price) || 0).toFixed(3)),
   }));
 
@@ -255,18 +254,16 @@ const generateInvoiceFromMovement = async (movementId, companyId, options = {}) 
 
   const allowIncomplete = options.allow_incomplete === true || options.allow_incomplete === 'true';
   if (!readiness.is_ready && !allowIncomplete) {
-    throw buildHttpError(
-      'Informations manquantes pour générer la facture',
-      400,
-      { missing_fields: readiness.missing_fields }
-    );
+    throw buildHttpError('Informations manquantes pour générer la facture', 400, {
+      missing_fields: readiness.missing_fields,
+    });
   }
 
   // Préparer les items avec tva_rate depuis le produit
   const items = movement.items.map((item) => ({
     unit_price: item.unit_price,
     quantity: item.quantity,
-    tva_rate: item.product?.tva_rate ?? 19,
+    tva_rate: item.tva_rate ?? item.product?.tva_rate ?? 19,
   }));
 
   const { total_ht, tva_breakdown, tva_amount, timbre_fiscal, total_ttc, rs_amount, net_payable } =
@@ -325,6 +322,18 @@ const createCreditNote = async (originalInvoiceId, companyId, reason = '') => {
     err.statusCode = 400;
     throw err;
   }
+  // L'avoir reprend la totalité de la facture : un seul avoir par facture
+  const existingCreditNote = await invoiceRepository.findCreditNoteFor(
+    originalInvoiceId,
+    companyId
+  );
+  if (existingCreditNote) {
+    const err = new Error(
+      `Un avoir (${existingCreditNote.reference}) existe déjà pour la facture ${original.reference}`
+    );
+    err.statusCode = 409;
+    throw err;
+  }
 
   const year = new Date().getFullYear();
   const lastNum = await invoiceRepository.getLastReferenceNumber(companyId, year, 'AVO');
@@ -343,7 +352,9 @@ const createCreditNote = async (originalInvoiceId, companyId, reason = '') => {
     original_invoice_id: originalInvoiceId,
     notes: reason || `Avoir sur facture ${original.reference}`,
     status: 'PENDING',
-    movementId: original.movementId,
+    // Pas de mouvement propre : movementId est unique et appartient déjà à la
+    // facture d'origine. Les lignes de l'avoir sont lues via original_invoice_id.
+    movementId: null,
     clientId: original.clientId || null,
     companyId,
   });
@@ -356,13 +367,22 @@ const getInvoicePdfData = async (invoiceId, companyId) => {
   const invoice = await invoiceRepository.getInvoiceById(invoiceId, companyId);
   if (!invoice) throw new Error('Facture introuvable');
 
+  // Un avoir n'a pas de mouvement propre : ses lignes sont celles de la facture d'origine
+  const original = invoice.original_invoice_id
+    ? await invoiceRepository.getInvoiceById(invoice.original_invoice_id, companyId)
+    : null;
+  const sourceMovement = invoice.movement || original?.movement || null;
+  const sign = invoice.invoice_type === 'CREDIT_NOTE' ? -1 : 1;
+
   const items =
-    invoice.movement?.items?.map((item) => ({
+    sourceMovement?.items?.map((item) => ({
+      productCode: item.product?.code ?? null,
       productName: item.product?.name || 'Produit',
+      unitOfMeasure: item.product?.unit_of_measure || null,
       quantity: item.quantity,
       unitPriceHT: item.unit_price,
-      tvaRate: item.product?.tva_rate ?? 19,
-      totalLineHT: parseFloat((item.quantity * item.unit_price).toFixed(3)),
+      tvaRate: item.tva_rate ?? item.product?.tva_rate ?? 19,
+      totalLineHT: parseFloat((sign * item.quantity * item.unit_price).toFixed(3)),
     })) || [];
 
   let tva_breakdown = [];
@@ -375,32 +395,36 @@ const getInvoicePdfData = async (invoiceId, companyId) => {
   }
 
   // Si pas de tva_breakdown stocké (anciennes factures), calculer une ventilation par défaut
-  if (tva_breakdown.length === 0 && invoice.total_ht > 0) {
+  if (tva_breakdown.length === 0 && invoice.total_ht !== 0) {
     tva_breakdown = [
-      {
-        rate: 19,
-        base_ht: invoice.total_ht,
-        tva_amount: invoice.tva_amount,
-      },
+      { rate: 19, base_ht: Math.abs(invoice.total_ht), tva_amount: Math.abs(invoice.tva_amount) },
     ];
   }
+  // Avoir : la ventilation copiée de la facture d'origine est en positif
+  tva_breakdown = tva_breakdown.map((t) => ({
+    rate: t.rate,
+    base_ht: sign * Math.abs(t.base_ht),
+    tva_amount: sign * Math.abs(t.tva_amount),
+  }));
 
   const payableAmount = invoice.net_payable ?? invoice.total_ttc;
-  const amountInWords = amountToWords(payableAmount);
+  const amountInWords = amountToWords(Math.abs(payableAmount));
 
+  // Champs absents → null (le document affiche « — » et l'aperçu signale le manque)
   return {
     company: {
-      name: invoice.company?.name || 'Entreprise',
-      matriculeFiscale: invoice.company?.matriculeFiscale || 'N/A',
-      address: invoice.company?.address || 'N/A',
-      phone: invoice.company?.phone || 'N/A',
+      name: invoice.company?.name || null,
+      matriculeFiscale: invoice.company?.matriculeFiscale || null,
+      address: invoice.company?.address || null,
+      phone: invoice.company?.phone || null,
     },
     client: invoice.client
       ? {
           name: invoice.client.name,
-          matriculeFiscale: invoice.client.matriculeFiscale || 'N/A',
-          phone: invoice.client.phone || 'N/A',
-          address: invoice.client.address || 'N/A',
+          matriculeFiscale: invoice.client.matriculeFiscale || null,
+          codeTva: invoice.client.codeTva || null,
+          phone: invoice.client.phone || null,
+          address: invoice.client.address || null,
         }
       : null,
     invoiceDetails: {
@@ -411,13 +435,15 @@ const getInvoicePdfData = async (invoiceId, companyId) => {
       is_suspended: invoice.is_suspended || false,
       attestation_ref: invoice.attestation_ref,
       purchase_order_ref: invoice.purchase_order_ref,
+      movement_reference: sourceMovement?.reference || null,
+      original_invoice: original ? { reference: original.reference, date: original.date } : null,
       notes: invoice.notes,
       payment_terms: invoice.payment_terms,
       total_ht: invoice.total_ht,
       tva_amount: invoice.tva_amount,
       timbre_fiscal: invoice.timbre_fiscal,
       total_ttc: invoice.total_ttc,
-      net_payable: invoice.net_payable ?? invoice.total_ttc,
+      net_payable: payableAmount,
     },
     fiscalSummary: {
       total_ht: invoice.total_ht,
@@ -446,7 +472,11 @@ const getAllInvoices = async (page, companyId, filters = {}) => {
 };
 
 const updateInvoiceStatus = async (invoiceId, status, companyId) => {
-  if (!['PENDING', 'PAID', 'CANCELLED'].includes(status)) {
+  // « Payée » / « partiellement payée » découlent des règlements (paymentService)
+  if (status === 'PAID' || status === 'PARTIALLY_PAID') {
+    throw buildHttpError('Enregistrez un règlement pour marquer la facture comme payée', 400);
+  }
+  if (!['PENDING', 'CANCELLED'].includes(status)) {
     throw new Error('Statut invalide');
   }
   return await invoiceRepository.updateStatus(invoiceId, status, companyId);

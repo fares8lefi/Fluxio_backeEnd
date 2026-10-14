@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const { authCookieOptions } = require('../utils/cookieOptions');
 const userRepository = require('../repositories/userRepository');
 
 /**
@@ -38,14 +39,12 @@ const requireAuthUser = (req, res, next) => {
             const refreshResult = await userService.refreshAccessToken(refreshToken);
 
             // Set cookies for the new tokens
-            res.cookie('jwt_login', refreshResult.accessToken, {
-              httpOnly: true,
-              maxAge: 15 * 60 * 1000,
-            });
-            res.cookie('jwt_refresh', refreshResult.refreshToken, {
-              httpOnly: true,
-              maxAge: 10 * 24 * 60 * 60 * 1000,
-            });
+            res.cookie('jwt_login', refreshResult.accessToken, authCookieOptions(15 * 60 * 1000));
+            res.cookie(
+              'jwt_refresh',
+              refreshResult.refreshToken,
+              authCookieOptions(10 * 24 * 60 * 60 * 1000)
+            );
 
             const foundUser = await userRepository.findById(refreshResult.user.id);
             if (!foundUser) {

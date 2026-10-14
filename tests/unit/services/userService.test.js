@@ -20,7 +20,7 @@ describe('UserService', () => {
       prisma.user.findUnique.mockResolvedValue(null);
       await expect(
         userService.loginUser({ email: 'test@test.com', password: 'password' })
-      ).rejects.toThrow('email not found');
+      ).rejects.toMatchObject({ message: 'Email ou mot de passe incorrect', statusCode: 401 });
     });
 
     it('devrait retourner une erreur si le mot de passe est faux', async () => {
@@ -32,7 +32,7 @@ describe('UserService', () => {
       bcrypt.compare.mockResolvedValue(false);
       await expect(
         userService.loginUser({ email: 'test@test.com', password: 'wrong' })
-      ).rejects.toThrow('password invalid');
+      ).rejects.toMatchObject({ message: 'Email ou mot de passe incorrect', statusCode: 401 });
     });
 
     it('devrait retourner le nom de la company avec les tokens', async () => {

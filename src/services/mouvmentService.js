@@ -52,17 +52,19 @@ const createMouvment = async (data, user) => {
 
   data.createdById = user.id;
 
-  // Définir le prix unitaire si non fourni (depuis le catalogue produit)
+  // Prix unitaire par défaut + instantané du taux de TVA et du prix d'achat :
+  // une facture réimprimée et la marge restent justes si la fiche produit change
   if (data.items && Array.isArray(data.items)) {
     for (const item of data.items) {
+      const product = await productRepository.getProductById(item.productId, user.companyId);
+      if (!product) continue;
       if (item.unit_price === undefined || item.unit_price === null) {
-        const product = await productRepository.getProductById(item.productId, user.companyId);
-        if (product) {
-          item.unit_price = ['OUT', 'RETURN_CLIENT'].includes(data.type)
-            ? product.selling_price
-            : product.purchase_price;
-        }
+        item.unit_price = ['OUT', 'RETURN_CLIENT'].includes(data.type)
+          ? product.selling_price
+          : product.purchase_price;
       }
+      item.tva_rate = product.tva_rate;
+      item.purchase_price = product.purchase_price;
     }
   }
 
@@ -75,6 +77,16 @@ const createMouvment = async (data, user) => {
   }
 
   const { type, items, supplierId, clientId, reference, note, status, createdById } = data;
+  // Facture fournisseur : uniquement pour une entrée de stock
+  const supplierInvoice =
+    type === 'IN'
+      ? {
+          supplier_invoice_ref: data.supplier_invoice_ref?.trim() || null,
+          supplier_invoice_date: data.supplier_invoice_date
+            ? new Date(data.supplier_invoice_date)
+            : null,
+        }
+      : {};
 
   // Envelopper dans une transaction
   return await prisma.$transaction(async (tx) => {
@@ -115,6 +127,7 @@ const createMouvment = async (data, user) => {
         clientId: clientId || null,
         reference: reference || null,
         note: note || null,
+        ...supplierInvoice,
         status: status || 'CONFIRMED',
         createdById,
         companyId: user.companyId,
@@ -150,6 +163,17 @@ const cancelMouvment = async (mouvmentId, companyId) => {
       } else if (['OUT', 'RETURN_SUPPLIER'].includes(mouvment.type)) {
         // Si c'était une sortie, on augmente le stock pour annuler
         await increaseStock(item.productId, item.quantity, companyId, tx);
+      } else if (mouvment.type === 'ADJUSTMENT') {
+        // Quantité signée : on retire l'écart appliqué (sans passer sous zéro)
+        const product = await productRepository.getProductById(item.productId, companyId, tx);
+        if (product && product.stock_quantity - item.quantity < 0) {
+          const error = new Error(
+            `Annulation impossible : le stock de « ${product.name} » deviendrait négatif`
+          );
+          error.statusCode = 400;
+          throw error;
+        }
+        await increaseStock(item.productId, -item.quantity, companyId, tx);
       }
     }
 
@@ -170,9 +194,10 @@ const cancelMouvment = async (mouvmentId, companyId) => {
  */
 const getAllMouvments = async (page, companyId, filters = {}, limitOverride) => {
   const parsedLimit = parseInt(limitOverride, 10);
-  const limit = Number.isFinite(parsedLimit) && parsedLimit > 0
-    ? Math.min(parsedLimit, 100)
-    : parseInt(process.env.limitByPage) || 10;
+  const limit =
+    Number.isFinite(parsedLimit) && parsedLimit > 0
+      ? Math.min(parsedLimit, 100)
+      : parseInt(process.env.limitByPage) || 10;
   const numbrePage = parseInt(page) || 1;
 
   const mouvments = await mouvmentRepository.findPaginated(numbrePage, limit, companyId, filters);

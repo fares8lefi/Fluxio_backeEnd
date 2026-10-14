@@ -2,21 +2,34 @@ const express = require('express');
 const router = express.Router();
 const suppliersController = require('../controllers/suppliersController');
 const { requireAuthUser } = require('../middlewares/authMiddelwares');
+const { canWriteStock } = require('../middlewares/companyRole');
 
 //create
-router.post('/addSuppliers', requireAuthUser, suppliersController.addSuppliers);
+router.post('/addSuppliers', requireAuthUser, canWriteStock, suppliersController.addSuppliers);
 //delete
-router.delete('/deleteSuppliers/:id', requireAuthUser, suppliersController.deleteSuppliers);
+router.delete(
+  '/deleteSuppliers/:id',
+  requireAuthUser,
+  canWriteStock,
+  suppliersController.deleteSuppliers
+);
 //update
-router.put('/updateSuppliers/:id', requireAuthUser, suppliersController.updateSuppliers);
+router.put(
+  '/updateSuppliers/:id',
+  requireAuthUser,
+  canWriteStock,
+  suppliersController.updateSuppliers
+);
 router.patch(
   '/updateSuppliersStatus/:id',
   requireAuthUser,
+  canWriteStock,
   suppliersController.updateSuppliersStatus
 );
 router.patch(
   '/activatedSuppliersStatus/:id',
   requireAuthUser,
+  canWriteStock,
   suppliersController.activatedSuppliersStatus
 );
 //get

@@ -5,24 +5,33 @@ const userController = require('../controllers/userController');
 const { requireAuthUser } = require('../middlewares/authMiddelwares');
 
 const { isAdmin } = require('../middlewares/isAdminMiddelware');
+const { loginLimiter, otpLimiter } = require('../middlewares/rateLimiters');
 /* GET users listing. */
 //post
 router.post('/createUser', userController.createUser);
-router.post('/loginUser', userController.loginUser);
+router.post('/loginUser', loginLimiter, userController.loginUser);
 router.post('/refreshToken', userController.refreshToken);
 router.post('/logOutUser', requireAuthUser, userController.logOutUser);
-router.post('/resendCode', userController.resendCode);
-router.post('/forgetPassword', userController.forgetPassword);
+router.post('/resendCode', otpLimiter, userController.resendCode);
+router.post('/forgetPassword', otpLimiter, userController.forgetPassword);
 
 //put
 router.put('/updatePersonnelData', requireAuthUser, userController.updatePersonnelData);
 router.put('/updateUserStatus', requireAuthUser, userController.updateUserStatus);
-router.put('/foorgetPasswordVerifyCode', userController.foorgetPasswordVerifyCode);
-router.put('/verifyAccounts', userController.verifyAccounts);
+router.put('/foorgetPasswordVerifyCode', otpLimiter, userController.foorgetPasswordVerifyCode);
+router.put('/verifyAccounts', otpLimiter, userController.verifyAccounts);
 router.put('/changePassword', requireAuthUser, userController.changePassword);
 
 //get
-router.get('/me', requireAuthUser, userController.getMe);
+// Visitor with no auth cookie at all: answer "no session" (200, user: null)
+// instead of a 401 that the client would then try to refresh
+const allowGuest = (req, res, next) => {
+  const hasSession =
+    req.cookies?.jwt_login || req.cookies?.jwt_refresh || req.headers?.authorization;
+  if (!hasSession) return res.status(200).json({ success: true, user: null });
+  return next();
+};
+router.get('/me', allowGuest, requireAuthUser, userController.getMe);
 router.get('/getAllUsers', requireAuthUser, isAdmin, userController.getAllUsers);
 router.get('/getConnectedUser', requireAuthUser, isAdmin, userController.getConnectedUser);
 

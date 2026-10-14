@@ -95,8 +95,7 @@ describe('managerService', () => {
         endDate: '2026-03-31',
       });
 
-      const spanDays =
-        (period.endDate.getTime() - period.startDate.getTime()) / 86400000;
+      const spanDays = (period.endDate.getTime() - period.startDate.getTime()) / 86400000;
       const previousSpanDays =
         (period.previous.endDate.getTime() - period.previous.startDate.getTime()) / 86400000;
 
@@ -127,12 +126,23 @@ describe('managerService', () => {
   describe('getManagerKpis', () => {
     it('devrait distinguer CA facturé et CA encaissé et calculer le recouvrement', async () => {
       prisma.invoice.aggregate.mockImplementation(async ({ where }) => {
-        if (where.invoice_type === 'SALE' && where.status === 'PAID') {
-          return { _sum: { total_ttc: 400 } };
+        // Encaissé : somme des règlements reçus
+        if (where.invoice_type === 'SALE' && where.status?.in?.includes('PAID')) {
+          return { _sum: { amount_paid: 400 } };
         }
-        if (where.status === 'PENDING') return { _sum: { total_ttc: 600 } };
+        // Ouvertes : net à payer − déjà réglé
+        if (where.status?.in?.includes('PENDING'))
+          return { _sum: { net_payable: 600, amount_paid: 0 } };
         if (where.invoice_type === 'SALE') {
-          return { _sum: { total_ttc: 1000, total_ht: 800, tva_amount: 199, rs_amount: 10 } };
+          return {
+            _sum: {
+              total_ttc: 1000,
+              total_ht: 800,
+              tva_amount: 199,
+              rs_amount: 10,
+              net_payable: 1000,
+            },
+          };
         }
         return emptyAggregate;
       });
@@ -140,7 +150,18 @@ describe('managerService', () => {
       prisma.client.count.mockResolvedValue(7);
       prisma.movement.aggregate.mockResolvedValue({ _sum: { total_amount: 1000 } });
       prisma.product.findMany.mockResolvedValue([
-        { id: 'p1', name: 'Clavier', code: 1, stock_quantity: 10, stock_min: 2, stock_max: 50, purchase_price: 30, selling_price: 50, tva_rate: 19, categoryId: null },
+        {
+          id: 'p1',
+          name: 'Clavier',
+          code: 1,
+          stock_quantity: 10,
+          stock_min: 2,
+          stock_max: 50,
+          purchase_price: 30,
+          selling_price: 50,
+          tva_rate: 19,
+          categoryId: null,
+        },
       ]);
 
       const result = await managerService.getManagerKpis(COMPANY, { period: 'month' });
@@ -152,7 +173,7 @@ describe('managerService', () => {
       expect(result.kpis.average_basket.value).toBe(250);
       expect(result.kpis.client_count.value).toBe(7);
       expect(result.kpis.stock_value_cost.value).toBe(300);
-      expect(result.kpis.margin_estimated_note).toContain('Estimation');
+      expect(result.kpis.margin_estimated_note).toContain('au moment de la vente');
       expect(result.period).toHaveProperty('previousStartDate');
     });
 
@@ -222,6 +243,7 @@ describe('managerService', () => {
               timbre_fiscal: 0,
               rs_amount: 0,
               net_payable: 500,
+              amount_paid: 500,
               tva_breakdown: null,
             },
             {
@@ -262,9 +284,7 @@ describe('managerService', () => {
       expect(result.collection.rate_pct).toBeCloseTo(43.1, 1);
 
       // tva_breakdown corrompu => aucune exception, ventilation partielle
-      expect(result.tva_by_rate).toEqual([
-        { rate: 19, base_ht: 200, tva_amount: 38 },
-      ]);
+      expect(result.tva_by_rate).toEqual([{ rate: 19, base_ht: 200, tva_amount: 38 }]);
       expect(result.trend).toHaveLength(12);
     });
 
@@ -282,19 +302,27 @@ describe('managerService', () => {
       startOfPeriod.setUTCMonth(startOfPeriod.getUTCMonth(), 1);
       startOfPeriod.setUTCHours(0, 0, 0, 0);
 
-      prisma.client.count.mockImplementation(async ({ where }) =>
-      where.is_active ? 7 : 10
-    );
+      prisma.client.count.mockImplementation(async ({ where }) => (where.is_active ? 7 : 10));
       prisma.movement.groupBy.mockResolvedValue([
         { clientId: 'c1', _min: { created_at: startOfPeriod } }, // nouveau
         { clientId: 'c2', _min: { created_at: new Date('2024-01-01') } }, // ancien
       ]);
-      prisma.invoice.aggregate.mockResolvedValue({ _sum: { total_ttc: 1200 }, _count: { clientId: 4 } });
+      prisma.invoice.aggregate.mockResolvedValue({
+        _sum: { total_ttc: 1200 },
+        _count: { clientId: 4 },
+      });
       // invoice.groupBy sert deux fois : classement clients (avec `take` + `_count`)
       // et clients à risque (avec `_min`, sans `take`).
       prisma.invoice.groupBy.mockImplementation(async ({ take }) => {
         if (!take) {
-          return [{ clientId: 'c2', _sum: { total_ttc: 300 }, _min: { date: new Date('2025-01-01') } }];
+          // Impayés > 60 j : reste à payer = net à payer − déjà réglé (400 − 100)
+          return [
+            {
+              clientId: 'c2',
+              _sum: { net_payable: 400, amount_paid: 100 },
+              _min: { date: new Date('2025-01-01') },
+            },
+          ];
         }
         return [
           { clientId: 'c2', _sum: { total_ttc: 300 }, _count: { _all: 3 } },
@@ -325,9 +353,42 @@ describe('managerService', () => {
   describe('getManagerStock', () => {
     it('devrait valoriser le stock, calculer couverture, retours et anomalies', async () => {
       prisma.product.findMany.mockResolvedValue([
-        { id: 'p1', name: 'A', code: 1, stock_quantity: 100, stock_min: 10, stock_max: 200, purchase_price: 10, selling_price: 12, tva_rate: 19, categoryId: 'cat1' },
-        { id: 'p2', name: 'B', code: 2, stock_quantity: 0, stock_min: 5, stock_max: 50, purchase_price: 20, selling_price: 19, tva_rate: 19, categoryId: 'cat1' },
-        { id: 'p3', name: 'C', code: 3, stock_quantity: -2, stock_min: 5, stock_max: 50, purchase_price: 5, selling_price: 8, tva_rate: 19, categoryId: 'cat2' },
+        {
+          id: 'p1',
+          name: 'A',
+          code: 1,
+          stock_quantity: 100,
+          stock_min: 10,
+          stock_max: 200,
+          purchase_price: 10,
+          selling_price: 12,
+          tva_rate: 19,
+          categoryId: 'cat1',
+        },
+        {
+          id: 'p2',
+          name: 'B',
+          code: 2,
+          stock_quantity: 0,
+          stock_min: 5,
+          stock_max: 50,
+          purchase_price: 20,
+          selling_price: 19,
+          tva_rate: 19,
+          categoryId: 'cat1',
+        },
+        {
+          id: 'p3',
+          name: 'C',
+          code: 3,
+          stock_quantity: -2,
+          stock_min: 5,
+          stock_max: 50,
+          purchase_price: 5,
+          selling_price: 8,
+          tva_rate: 19,
+          categoryId: 'cat2',
+        },
       ]);
       prisma.category.findMany.mockResolvedValue([
         { id: 'cat1', name: 'Boissons' },
@@ -339,7 +400,8 @@ describe('managerService', () => {
       ]);
       prisma.movement.aggregate.mockImplementation(async ({ where }) => {
         if (where.type === 'IN') return { _sum: { total_amount: 500 }, _count: { _all: 2 } };
-        if (where.type === 'RETURN_SUPPLIER') return { _sum: { total_amount: 20 }, _count: { _all: 1 } };
+        if (where.type === 'RETURN_SUPPLIER')
+          return { _sum: { total_amount: 20 }, _count: { _all: 1 } };
         return { _sum: { total_amount: 0 }, _count: { _all: 0 } };
       });
       prisma.movementItem.groupBy.mockResolvedValue([{ productId: 'p1', _sum: { quantity: 10 } }]);

@@ -45,3 +45,23 @@ exports.updateQuoteStatus = async (req, res) => {
     return res.status(400).json({ success: false, message: error.message });
   }
 };
+
+// POST /api/quotes/:id/convert — devis accepté → sortie de stock + facture
+exports.convertQuote = async (req, res) => {
+  try {
+    const user = req.session && req.session.user ? req.session.user : req.user;
+    const result = await quoteService.convertToInvoice(req.params.id, user, req.body || {});
+    return res.status(201).json({
+      success: true,
+      message: `Facture ${result.invoice.reference} créée à partir du devis`,
+      ...result,
+    });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message,
+      ...(error.missing_fields && { missing_fields: error.missing_fields }),
+      ...(error.details && { errors: error.details }),
+    });
+  }
+};

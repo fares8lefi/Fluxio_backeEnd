@@ -1,4 +1,5 @@
 const userService = require('../services/userService');
+const { authCookieOptions } = require('../utils/cookieOptions');
 
 // POST /api/users/register
 module.exports.createUser = async (req, res) => {
@@ -83,16 +84,10 @@ module.exports.loginUser = async (req, res) => {
     const result = await userService.loginUser(req.body);
 
     // Access Token: 15 minutes
-    res.cookie('jwt_login', result.accessToken, {
-      httpOnly: true,
-      maxAge: 15 * 60 * 1000,
-    });
+    res.cookie('jwt_login', result.accessToken, authCookieOptions(15 * 60 * 1000));
 
     // Refresh Token: 10 days
-    res.cookie('jwt_refresh', result.refreshToken, {
-      httpOnly: true,
-      maxAge: result.maxTime * 1000,
-    });
+    res.cookie('jwt_refresh', result.refreshToken, authCookieOptions(result.maxTime * 1000));
 
     return res.status(200).json({
       success: true,
@@ -127,8 +122,8 @@ module.exports.getConnectedUser = async function (req, res) {
 
 module.exports.getMe = async function (req, res) {
   try {
-    const user = req.session && req.session.user ? req.session.user : req.user;
-    res.status(200).json({ success: true, user: user });
+    const user = req.user || (req.session && req.session.user);
+    res.status(200).json({ success: true, user: user ? userService.toPublicUser(user) : null });
   } catch (error) {
     console.error(error);
     const statusCode = error.statusCode || 500;
@@ -143,14 +138,8 @@ module.exports.logOutUser = async (req, res) => {
     if (id) {
       await userService.logoutUser(id);
     }
-    res.cookie('jwt_login', '', {
-      maxAge: 1,
-      httpOnly: true,
-    });
-    res.cookie('jwt_refresh', '', {
-      maxAge: 1,
-      httpOnly: true,
-    });
+    res.cookie('jwt_login', '', authCookieOptions(1));
+    res.cookie('jwt_refresh', '', authCookieOptions(1));
     return res.status(200).json({ success: true, message: 'Déconnecté avec succès' });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
@@ -176,16 +165,10 @@ module.exports.refreshToken = async (req, res) => {
     const result = await userService.refreshAccessToken(refreshToken);
 
     // Set access token cookie
-    res.cookie('jwt_login', result.accessToken, {
-      httpOnly: true,
-      maxAge: 15 * 60 * 1000,
-    });
+    res.cookie('jwt_login', result.accessToken, authCookieOptions(15 * 60 * 1000));
 
     // Set refresh token cookie (rotated refresh token)
-    res.cookie('jwt_refresh', result.refreshToken, {
-      httpOnly: true,
-      maxAge: 10 * 24 * 60 * 60 * 1000,
-    });
+    res.cookie('jwt_refresh', result.refreshToken, authCookieOptions(10 * 24 * 60 * 60 * 1000));
 
     return res.status(200).json({
       success: true,

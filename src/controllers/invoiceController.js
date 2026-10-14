@@ -24,11 +24,7 @@ exports.getMovementsForInvoice = async (req, res) => {
     if (onlyNotInvoiced === 'true') filters.onlyNotInvoiced = true;
     if (onlyInvoiced === 'true') filters.onlyInvoiced = true;
 
-    const result = await invoiceService.getMovementsForInvoice(
-      page || 1,
-      user.companyId,
-      filters
-    );
+    const result = await invoiceService.getMovementsForInvoice(page || 1, user.companyId, filters);
     return res.status(200).json({ success: true, ...result });
   } catch (error) {
     const statusCode = error.statusCode || 500;
@@ -58,23 +54,19 @@ exports.generateInvoice = async (req, res) => {
       return res.status(400).json({ success: false, message: 'movementId est requis' });
     }
 
-    const invoice = await invoiceService.generateInvoiceFromMovement(
-      movementId,
-      user.companyId,
-      {
-        is_suspended: is_suspended === true || is_suspended === 'true',
-        apply_rs: apply_rs === true || apply_rs === 'true',
-        rs_rate: parseFloat(rs_rate) || 1.0,
-        attestation_ref,
-        purchase_order_ref,
-        notes,
-        payment_terms,
-        clientId,
-        client,
-        company,
-        allow_incomplete: allow_incomplete === true || allow_incomplete === 'true',
-      }
-    );
+    const invoice = await invoiceService.generateInvoiceFromMovement(movementId, user.companyId, {
+      is_suspended: is_suspended === true || is_suspended === 'true',
+      apply_rs: apply_rs === true || apply_rs === 'true',
+      rs_rate: parseFloat(rs_rate) || 1.0,
+      attestation_ref,
+      purchase_order_ref,
+      notes,
+      payment_terms,
+      clientId,
+      client,
+      company,
+      allow_incomplete: allow_incomplete === true || allow_incomplete === 'true',
+    });
     return res.status(201).json({ success: true, message: 'Facture générée avec succès', invoice });
   } catch (error) {
     const statusCode = error.statusCode || 500;
@@ -144,7 +136,7 @@ exports.createCreditNote = async (req, res) => {
     );
     return res.status(201).json({
       success: true,
-      message: 'Facture d\'avoir créée avec succès',
+      message: "Facture d'avoir créée avec succès",
       invoice: creditNote,
     });
   } catch (error) {

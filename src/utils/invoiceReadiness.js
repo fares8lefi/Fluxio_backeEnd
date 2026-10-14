@@ -107,9 +107,13 @@ const computeInvoiceReadiness = ({ movement, company, client } = {}) => {
     ...(client
       ? collectEntityMissing('client', client, CLIENT_FIELDS)
       : [
-          toMissingEntry('client', { field: 'clientId', label: 'Client de la vente', required: true }, {
-            message: 'Aucun client rattaché au mouvement de vente',
-          }),
+          toMissingEntry(
+            'client',
+            { field: 'clientId', label: 'Client de la vente', required: true },
+            {
+              message: 'Aucun client rattaché au mouvement de vente',
+            }
+          ),
         ]),
     ...collectItemsMissing(movement?.items || []),
   ];

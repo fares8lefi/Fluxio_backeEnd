@@ -44,7 +44,9 @@ const updateCompanyGeneralInfo = async (id, rawData) => {
   }
 
   if (Object.keys(data).length === 0) {
-    const err = new Error('Aucun champ valide à mettre à jour (name, address, phone, matriculeFiscale)');
+    const err = new Error(
+      'Aucun champ valide à mettre à jour (name, address, phone, matriculeFiscale)'
+    );
     err.statusCode = 400;
     throw err;
   }

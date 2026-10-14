@@ -1,4 +1,5 @@
 const mouvmentService = require('../services/mouvmentService');
+const inventoryService = require('../services/inventoryService');
 
 // POST /api/mouvments/createMouvment
 module.exports.createMouvment = async (req, res) => {
@@ -26,7 +27,8 @@ module.exports.createMouvment = async (req, res) => {
 module.exports.getAllMouvment = async (req, res) => {
   try {
     const user = req.session && req.session.user ? req.session.user : req.user;
-    const { numbrePage, page, limit, type, status, startDate, endDate, clientId, supplierId } = req.query;
+    const { numbrePage, page, limit, type, status, startDate, endDate, clientId, supplierId } =
+      req.query;
 
     const filters = {};
     if (type) filters.type = type;
@@ -113,5 +115,27 @@ module.exports.getMouvmentsBySupplier = async (req, res) => {
   } catch (error) {
     const statusCode = error.statusCode || 500;
     return res.status(statusCode).json({ success: false, message: error.message });
+  }
+};
+
+// POST /api/mouvments/adjustments — inventaire / casse / perte
+module.exports.adjustStock = async (req, res) => {
+  try {
+    const user = req.session && req.session.user ? req.session.user : req.user;
+    const result = await inventoryService.applyAdjustment(user, req.body);
+    return res.status(201).json({
+      success: true,
+      message:
+        result.adjusted > 0
+          ? `${result.adjusted} produit(s) ajusté(s)`
+          : 'Aucun écart : stock inchangé',
+      ...result,
+    });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message,
+      ...(error.details && { errors: error.details }),
+    });
   }
 };

@@ -26,6 +26,14 @@ const getInvoiceById = async (id, companyId) => {
   });
 };
 
+// Avoir déjà émis sur une facture (au plus un par facture)
+const findCreditNoteFor = async (originalInvoiceId, companyId) => {
+  return prisma.invoice.findFirst({
+    where: { original_invoice_id: originalInvoiceId, companyId, invoice_type: 'CREDIT_NOTE' },
+    select: { id: true, reference: true },
+  });
+};
+
 const getInvoiceByMovementId = async (movementId, companyId) => {
   return prisma.invoice.findFirst({
     where: { movementId, companyId },
@@ -98,6 +106,7 @@ const getLastReferenceNumber = async (companyId, year, prefix) => {
 module.exports = {
   createInvoice,
   getInvoiceById,
+  findCreditNoteFor,
   getInvoiceByMovementId,
   findPaginated,
   countAll,

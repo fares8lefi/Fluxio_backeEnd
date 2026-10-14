@@ -42,7 +42,7 @@ module.exports.updateCompanyGeneralInfo = async (req, res) => {
     const company = await adminService.updateCompanyGeneralInfo(req.params.id, req.body);
     return res.status(200).json({
       success: true,
-      message: 'Informations générales de l\'entreprise mises à jour',
+      message: "Informations générales de l'entreprise mises à jour",
       company,
     });
   } catch (error) {
@@ -60,7 +60,9 @@ module.exports.toggleCompanyStatus = async (req, res) => {
     }
     const company = await adminService.toggleCompanyStatus(req.params.id, is_active);
     const action = is_active ? 'réactivée' : 'suspendue';
-    return res.status(200).json({ success: true, message: `Entreprise ${action} avec succès`, company });
+    return res
+      .status(200)
+      .json({ success: true, message: `Entreprise ${action} avec succès`, company });
   } catch (error) {
     const statusCode = error.statusCode || 500;
     return res.status(statusCode).json({ success: false, message: error.message });
@@ -76,7 +78,9 @@ module.exports.toggleUserStatus = async (req, res) => {
     }
     const user = await adminService.toggleUserStatus(req.params.id, is_active);
     const action = is_active ? 'réactivé' : 'suspendu';
-    return res.status(200).json({ success: true, message: `Utilisateur ${action} avec succès`, user });
+    return res
+      .status(200)
+      .json({ success: true, message: `Utilisateur ${action} avec succès`, user });
   } catch (error) {
     const statusCode = error.statusCode || 500;
     return res.status(statusCode).json({ success: false, message: error.message });

@@ -2,6 +2,7 @@
 const userRepository = require('../repositories/userRepository');
 const companyRepository = require('../repositories/companyRepository');
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const { sendEmailVerificationCode, sendEmailResetCode } = require('./SendEmail');
 const {
@@ -12,6 +13,66 @@ const {
 } = require('../validations/UserValidations');
 
 const maxTime = 240 * 60 * 60;
+
+/**
+ * Utilisateur tel qu'exposé au frontend (connexion et /me) : même forme partout,
+ * avec le nom de l'entreprise et le rôle dans l'entreprise.
+ */
+const toPublicUser = (user, companyName) => ({
+  id: user.id,
+  username: user.username,
+  email: user.email,
+  phone: user.phone ?? null,
+  role: user.role,
+  company_role: user.company_role ?? 'OWNER',
+  companyId: user.companyId ?? null,
+  company_name: companyName ?? user.company?.name ?? null,
+  status: user.is_active,
+});
+
+// ── Codes OTP ────────────────────────────────────────────────────────────
+const OTP_TTL_MS = 10 * 60 * 1000;
+const OTP_MAX_ATTEMPTS = 5;
+
+/** Code à 6 chiffres, tiré par un générateur cryptographique */
+const generateOtp = () => crypto.randomInt(100000, 1000000);
+
+/** Champs à enregistrer pour un nouveau code (compteur d'essais remis à zéro) */
+const newOtpFields = () => ({
+  code: generateOtp(),
+  code_expires_at: new Date(Date.now() + OTP_TTL_MS),
+  code_attempts: 0,
+});
+
+const otpError = (message, statusCode) => {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  return error;
+};
+
+/**
+ * Vérifie un code OTP. Chaque échec est compté ; au 5e, le code est invalidé et
+ * il faut en redemander un — 6 chiffres + 5 essais rendent la force brute vaine.
+ */
+const checkOtp = async (user, code) => {
+  if (!user.code || (user.code_expires_at && new Date() > new Date(user.code_expires_at))) {
+    throw otpError('Code expiré. Veuillez en demander un nouveau.', 400);
+  }
+  if ((user.code_attempts ?? 0) >= OTP_MAX_ATTEMPTS) {
+    throw otpError('Trop de tentatives. Veuillez demander un nouveau code.', 429);
+  }
+  if (String(user.code) !== String(code).trim()) {
+    const attempts = (user.code_attempts ?? 0) + 1;
+    const exhausted = attempts >= OTP_MAX_ATTEMPTS;
+    await userRepository.update(user.id, {
+      code_attempts: attempts,
+      ...(exhausted && { code: null, code_expires_at: null }),
+    });
+    throw exhausted
+      ? otpError('Trop de tentatives. Veuillez demander un nouveau code.', 429)
+      : otpError(`Code invalide — ${OTP_MAX_ATTEMPTS - attempts} essai(s) restant(s)`, 400);
+  }
+};
 
 const createAccessToken = (id) => {
   const expiry = process.env.ACCESS_TOKEN_EXPIRY || '15m';
@@ -33,7 +94,7 @@ const createUser = async (data) => {
     throw error;
   }
 
-  const { username, password, phone, email, company_name, matriculeFiscale } = data;
+  const { username, password, phone, email, company_name, matriculeFiscale, role } = data;
 
   const existingUser = await userRepository.findOneByEmail(email);
   if (existingUser) {
@@ -42,9 +103,8 @@ const createUser = async (data) => {
     throw error;
   }
 
-  const code = Math.floor(1000 + Math.random() * 9000);
   // Le code OTP expire dans 10 minutes
-  const code_expires_at = new Date(Date.now() + 10 * 60 * 1000);
+  const otp = newOtpFields();
 
   const company = await companyRepository.create({ name: company_name, matriculeFiscale });
 
@@ -54,12 +114,12 @@ const createUser = async (data) => {
       email,
       password,
       phone,
-      code,
-      code_expires_at,
+      ...otp,
       is_active: false,
+      role: role === 'admin' ? 'admin' : 'user',
       companyId: company.id,
     }),
-    sendEmailVerificationCode(email, username, code),
+    sendEmailVerificationCode(email, username, otp.code),
   ]);
 };
 
@@ -72,20 +132,14 @@ const verifyAccounts = async (email, code) => {
     throw error;
   }
 
-  if (String(user.code) !== String(code)) {
-    const error = new Error('Code invalide');
-    error.statusCode = 400;
-    throw error;
-  }
+  await checkOtp(user, code);
 
-  // Vérifier que le code OTP n'a pas expiré
-  if (user.code_expires_at && new Date() > new Date(user.code_expires_at)) {
-    const error = new Error('Code expiré. Veuillez en demander un nouveau.');
-    error.statusCode = 400;
-    throw error;
-  }
-
-  await userRepository.update(user.id, { is_active: true, code: null, code_expires_at: null });
+  await userRepository.update(user.id, {
+    is_active: true,
+    code: null,
+    code_expires_at: null,
+    code_attempts: 0,
+  });
 };
 
 const resendCode = async (email) => {
@@ -96,11 +150,10 @@ const resendCode = async (email) => {
     throw error;
   }
 
-  const code = Math.floor(1000 + Math.random() * 9000);
-  const code_expires_at = new Date(Date.now() + 10 * 60 * 1000);
-  await userRepository.update(user.id, { code, code_expires_at });
+  const otp = newOtpFields();
+  await userRepository.update(user.id, otp);
 
-  await sendEmailVerificationCode(email, user.username, code);
+  await sendEmailVerificationCode(email, user.username, otp.code);
 };
 
 /**
@@ -114,11 +167,10 @@ const forgetPassword = async (email) => {
     return;
   }
 
-  const code = Math.floor(1000 + Math.random() * 9000);
-  const code_expires_at = new Date(Date.now() + 10 * 60 * 1000);
-  await userRepository.update(user.id, { code, code_expires_at });
+  const otp = newOtpFields();
+  await userRepository.update(user.id, otp);
 
-  await sendEmailResetCode(email, user.username, code);
+  await sendEmailResetCode(email, user.username, otp.code);
 };
 
 /**
@@ -140,17 +192,7 @@ const forgetPasswordVerifyCode = async (email, code, newPassword) => {
     throw error;
   }
 
-  if (String(user.code) !== String(code)) {
-    const error = new Error('Code invalide');
-    error.statusCode = 400;
-    throw error;
-  }
-
-  if (user.code_expires_at && new Date() > new Date(user.code_expires_at)) {
-    const error = new Error('Code expiré. Veuillez en demander un nouveau.');
-    error.statusCode = 400;
-    throw error;
-  }
+  await checkOtp(user, code);
 
   const salt = await bcrypt.genSalt();
   const hashedPassword = await bcrypt.hash(newPassword, salt);
@@ -159,6 +201,7 @@ const forgetPasswordVerifyCode = async (email, code, newPassword) => {
     password: hashedPassword,
     code: null,
     code_expires_at: null,
+    code_attempts: 0,
   });
 };
 
@@ -174,11 +217,19 @@ const loginUser = async (data) => {
   const { email, password } = data;
 
   // Get full user including password for bcrypt compare
+  // Same 401 + message for unknown email and wrong password: avoids
+  // revealing which emails have an account (user enumeration)
+  const invalidCredentials = () => {
+    const error = new Error('Email ou mot de passe incorrect');
+    error.statusCode = 401;
+    return error;
+  };
+
   const user = await userRepository.findOneByEmailWithPassword(email);
-  if (!user) throw new Error('email not found');
+  if (!user) throw invalidCredentials();
 
   const auth = await bcrypt.compare(password, user.password);
-  if (!auth) throw new Error('password invalid');
+  if (!auth) throw invalidCredentials();
 
   const accessToken = createAccessToken(user.id);
   const refreshToken = createRefreshToken(user.id);
@@ -192,11 +243,8 @@ const loginUser = async (data) => {
   const userCompany = user.companyId ? await companyRepository.findById(user.companyId) : null;
   return {
     user: {
-      id: user.id,
-      email: user.email,
-      role: user.role,
-      status: user.is_active,
-      companyName: userCompany?.name || null,
+      ...toPublicUser(user, userCompany?.name),
+      companyName: userCompany?.name || null, // compatibilité
     },
     token: accessToken, // Backward compatibility
     accessToken,
@@ -375,6 +423,7 @@ module.exports = {
   forgetPassword,
   forgetPasswordVerifyCode,
   loginUser,
+  toPublicUser,
   getConnectedUser,
   changePassword,
   updatePersonnelData,

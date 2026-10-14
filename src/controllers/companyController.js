@@ -26,6 +26,10 @@ module.exports.updateMyCompany = async (req, res) => {
   } catch (error) {
     console.error(error);
     const statusCode = error.statusCode || 500;
-    return res.status(statusCode).json({ success: false, message: error.message });
+    return res.status(statusCode).json({
+      success: false,
+      message: error.message,
+      ...(error.details && { errors: error.details }),
+    });
   }
 };

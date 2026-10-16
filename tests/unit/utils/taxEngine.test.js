@@ -1,5 +1,6 @@
 const {
   calculateTotals,
+  creditNoteTotals,
   amountToWords,
   generateReference,
   TIMBRE_FISCAL,
@@ -119,6 +120,68 @@ describe('Tunisian taxEngine Unit Tests', () => {
       expect(result.total_ht).toBe(180);
       expect(result.tva_amount).toBe(34.2);
       expect(result.total_ttc).toBe(215.2);
+    });
+  });
+
+  describe('calculateTotals — taux hors barème', () => {
+    it('refuse un taux de TVA inconnu au lieu de le remplacer par 19 %', () => {
+      expect(() =>
+        calculateTotals([{ name: 'Vis', unit_price: 100, quantity: 1, tva_rate: 10 }])
+      ).toThrow(/Taux de TVA invalide \(10 %\) pour « Vis »/);
+    });
+
+    it('applique 19 % quand le taux est absent', () => {
+      const result = calculateTotals([{ unit_price: 100, quantity: 1 }]);
+      expect(result.tva_breakdown).toEqual([{ rate: 19, base_ht: 100, tva_amount: 19 }]);
+    });
+
+    it('refuse un taux de RS inconnu au lieu de calculer à 1 %', () => {
+      const items = [{ unit_price: 1000, quantity: 1, tva_rate: 19 }];
+      expect(() => calculateTotals(items, { apply_rs: true, rs_rate: 3 })).toThrow(
+        expect.objectContaining({ statusCode: 400 })
+      );
+    });
+
+    it("renvoie le taux de RS réellement appliqué", () => {
+      const items = [{ unit_price: 1000, quantity: 1, tva_rate: 19 }];
+      const result = calculateTotals(items, { apply_rs: true, rs_rate: '5' });
+      expect(result).toMatchObject({ apply_rs: true, rs_rate: 5, rs_amount: 59.55 });
+    });
+
+    it("n'active pas la RS sur une vente en suspension, même si elle est demandée", () => {
+      const items = [{ unit_price: 1000, quantity: 1, tva_rate: 19 }];
+      const result = calculateTotals(items, { is_suspended: true, apply_rs: true, rs_rate: 1 });
+      expect(result).toMatchObject({ apply_rs: false, rs_amount: 0, net_payable: 1000 });
+    });
+  });
+
+  describe('creditNoteTotals', () => {
+    // Facture : 1000 HT + 190 TVA + 1 timbre = 1191 TTC ; RS 1 % = 11,91 ; net 1179,09
+    const original = {
+      total_ht: 1000,
+      tva_amount: 190,
+      timbre_fiscal: 1,
+      total_ttc: 1191,
+      apply_rs: true,
+      rs_rate: 1,
+      rs_amount: 11.91,
+      net_payable: 1179.09,
+    };
+
+    it('rembourse HT et TVA, sans le timbre', () => {
+      const cn = creditNoteTotals(original);
+      expect(cn).toMatchObject({ total_ht: -1000, tva_amount: -190, timbre_fiscal: 0, total_ttc: -1190 });
+    });
+
+    it('annule la retenue en sens inverse : net = TTC − RS', () => {
+      const cn = creditNoteTotals(original);
+      expect(cn).toMatchObject({ apply_rs: true, rs_rate: 1, rs_amount: -11.91, net_payable: -1178.09 });
+      expect(cn.net_payable).toBeCloseTo(cn.total_ttc - cn.rs_amount, 3);
+    });
+
+    it('sans RS sur la facture, net = TTC', () => {
+      const cn = creditNoteTotals({ ...original, apply_rs: false, rs_amount: 0, net_payable: 1191 });
+      expect(cn).toMatchObject({ apply_rs: false, rs_amount: 0, net_payable: -1190 });
     });
   });
 

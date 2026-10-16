@@ -4,6 +4,8 @@
  * afin que le frontend affiche un formulaire de complétion avant génération.
  */
 
+const { VALID_TVA_RATES } = require('./taxEngine');
+
 const COMPANY_FIELDS = [
   { field: 'matriculeFiscale', label: "Matricule fiscal de l'entreprise", required: true },
   { field: 'address', label: "Adresse de l'entreprise", required: false },
@@ -89,6 +91,19 @@ const collectItemsMissing = (items = []) => {
           context
         )
       );
+    }
+
+    // Taux figé sur la ligne (ou celui du produit) : hors barème, la facture serait refusée
+    const rate = item.tva_rate ?? item.product?.tva_rate;
+    if (!isBlank(rate) && !VALID_TVA_RATES.includes(Number(rate))) {
+      missing.push({
+        ...toMissingEntry(
+          'items',
+          { field: 'tva_rate', label: `Taux de TVA de « ${productName} »`, required: true },
+          context
+        ),
+        message: `Taux de TVA invalide (${rate} %) pour « ${productName} » : corrigez la fiche produit (0, 7, 13 ou 19 %)`,
+      });
     }
   });
 

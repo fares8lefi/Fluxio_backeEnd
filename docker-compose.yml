@@ -2,8 +2,10 @@ services:
   db:
     image: mysql:8.4
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
-      MYSQL_DATABASE: fluxiodb
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD manquant dans .env}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-fluxiodb}
+      MYSQL_USER: ${MYSQL_USER:?MYSQL_USER manquant dans .env}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD manquant dans .env}
     ports:
       - '3306:3306'
     volumes:
@@ -18,7 +20,7 @@ services:
     env_file:
       - .env
     environment:
-      DATABASE_URL: mysql://root:${MYSQL_ROOT_PASSWORD:-root}@db:3306/fluxiodb
+      DATABASE_URL: mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@db:3306/${MYSQL_DATABASE:-fluxiodb}
     depends_on:
       db:
         condition: service_healthy

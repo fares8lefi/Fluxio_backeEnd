@@ -1,4 +1,6 @@
 const adminService = require('../services/adminService');
+const adminKpiService = require('../services/adminKpiService');
+const managerService = require('../services/managerService');
 
 // GET /api/admin/stats
 module.exports.getPlatformStats = async (req, res) => {
@@ -86,3 +88,43 @@ module.exports.toggleUserStatus = async (req, res) => {
     return res.status(statusCode).json({ success: false, message: error.message });
   }
 };
+
+// ─── Indicateurs (KPI) de la plateforme ─────────────────────────────────────
+/** Enveloppe commune : erreurs 4xx remontées, détail technique des 500 masqué */
+const handleKpi = (name, loader) => async (req, res) => {
+  try {
+    const data = await loader(req);
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    const statusCode = error.statusCode || 500;
+    if (statusCode === 500) {
+      console.error(`[admin:kpi:${name}]`, error);
+      return res
+        .status(500)
+        .json({ success: false, message: 'Impossible de calculer les indicateurs' });
+    }
+    return res.status(statusCode).json({ success: false, message: error.message });
+  }
+};
+
+// GET /api/admin/kpis/overview?period=month|30d|prev_month|year|custom
+module.exports.getKpiOverview = handleKpi('overview', (req) =>
+  adminKpiService.getOverview(req.query)
+);
+
+// GET /api/admin/kpis/trend?months=12
+module.exports.getKpiTrend = handleKpi('trend', (req) => adminKpiService.getTrend(req.query));
+
+// GET /api/admin/kpis/top-companies?by=revenue|invoices|movements|users&limit=10&period=
+module.exports.getKpiTopCompanies = handleKpi('top-companies', (req) =>
+  adminKpiService.getTopCompanies(req.query)
+);
+
+// GET /api/admin/kpis/health
+module.exports.getKpiHealth = handleKpi('health', () => adminKpiService.getHealth());
+
+// GET /api/admin/companies/:id/kpis?period=  — mêmes KPI que la page « Pilotage »
+module.exports.getCompanyKpis = handleKpi('company', async (req) => {
+  await adminService.getCompanyDetails(req.params.id); // 404 si inexistante
+  return managerService.getManagerKpis(req.params.id, req.query);
+});

@@ -1,13 +1,16 @@
-FROM node 
+FROM node:20-alpine
+
+RUN apk add --no-cache openssl
 
 WORKDIR /app
 
-COPY package*.json /app
+COPY package*.json ./
+COPY prisma ./prisma
 
-RUN npm install 
+RUN npm install
 
 COPY . .
 
-EXPOSE 3000 
+EXPOSE 3000
 
 CMD ["npm", "start"]

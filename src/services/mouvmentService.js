@@ -3,6 +3,7 @@ const prisma = require('../../config/db');
 const mouvmentRepository = require('../repositories/mouvmentRepository');
 const productRepository = require('../repositories/productRepository');
 const { validateMouvmentRegistration } = require('../validations/mouvmentValidations');
+const { resolveTvaRate } = require('../utils/taxEngine');
 
 /**
  * Augmente le stock d'un produit (entrée / retour client)
@@ -43,7 +44,12 @@ const decreaseStock = async (productId, quantity, companyId, tx) => {
 /**
  * Crée un nouveau mouvement avec gestion des stocks via une transaction.
  */
-const createMouvment = async (data, user) => {
+/**
+ * @param {object} [options]
+ * @param {boolean} [options.keepTvaRate] — garder le taux de TVA fourni sur chaque ligne
+ *   (conversion d'un devis : la facture doit reprendre le taux du devis). Usage interne.
+ */
+const createMouvment = async (data, user, { keepTvaRate = false } = {}) => {
   if (!user) {
     const error = new Error('Utilisateur non authentifié');
     error.statusCode = 401;
@@ -63,7 +69,10 @@ const createMouvment = async (data, user) => {
           ? product.selling_price
           : product.purchase_price;
       }
-      item.tva_rate = product.tva_rate;
+      item.tva_rate =
+        keepTvaRate && item.tva_rate !== undefined && item.tva_rate !== null
+          ? resolveTvaRate(item.tva_rate, `« ${product.name} »`)
+          : product.tva_rate;
       item.purchase_price = product.purchase_price;
     }
   }

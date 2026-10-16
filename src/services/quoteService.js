@@ -155,6 +155,8 @@ const convertToInvoice = async (id, user, options = {}) => {
       productId: l.productId,
       quantity: Number(l.quantity),
       unit_price: round3(Number(l.unit_price) * (1 - discount / 100)),
+      // Taux du devis, pas celui de la fiche produit : la facture doit reprendre le devis
+      tva_rate: l.tva_rate,
     };
   });
 
@@ -166,7 +168,8 @@ const convertToInvoice = async (id, user, options = {}) => {
       reference: quote.reference,
       note: `Livraison suite au devis ${quote.reference}`,
     },
-    user
+    user,
+    { keepTvaRate: true }
   );
 
   let invoice;

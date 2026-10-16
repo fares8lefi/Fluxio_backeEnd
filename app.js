@@ -48,7 +48,7 @@ app.use(
 app.use(logger('dev'));
 app.use(
   cors({
-    origin: (process.env.FRONTEND_URL || 'http://localhost:5174').split(','),
+    origin: (process.env.FRONTEND_URL || 'http://localhost:5173').split(','),
     credentials: true,
     // Nom de fichier des exports CSV lisible par le navigateur
     exposedHeaders: ['Content-Disposition'],

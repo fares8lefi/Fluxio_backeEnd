@@ -13,6 +13,7 @@
     "e2e": "artillery run tests/artillerr.yml",
     "lint": "eslint .",
     "format": "prettier --write .",
+    "fix:credit-notes": "node scripts/fix-credit-notes.js",
     "postinstall": "prisma generate"
   },
   "dependencies": {

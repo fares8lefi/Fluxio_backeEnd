@@ -51,11 +51,12 @@ describe('quoteService.convertToInvoice', () => {
         clientId: 'k1',
         reference: 'DEV-2026-0004',
         items: [
-          { productId: 'p1', quantity: 85, unit_price: 30.4 }, // 32 − 5 %
-          { productId: 'p2', quantity: 30, unit_price: 18.75 },
+          { productId: 'p1', quantity: 85, unit_price: 30.4, tva_rate: 19 }, // 32 − 5 %
+          { productId: 'p2', quantity: 30, unit_price: 18.75, tva_rate: 19 },
         ],
       }),
-      user
+      user,
+      { keepTvaRate: true } // la facture reprend le taux du devis
     );
     expect(invoiceService.generateInvoiceFromMovement).toHaveBeenCalledWith(
       'm1',

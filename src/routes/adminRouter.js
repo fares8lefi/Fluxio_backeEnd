@@ -10,12 +10,22 @@ router.use(requireAuthUser, isAdmin);
 // ─── Dashboard plateforme ───────────────────────────────────────────────────
 router.get('/stats', adminController.getPlatformStats);
 
+// ─── Indicateurs (KPI) de la plateforme ─────────────────────────────────────
+// Période commune : ?period=month|30d|prev_month|year|custom (&startDate&endDate)
+router.get('/kpis/overview', adminController.getKpiOverview);
+router.get('/kpis/trend', adminController.getKpiTrend);
+router.get('/kpis/top-companies', adminController.getKpiTopCompanies);
+router.get('/kpis/health', adminController.getKpiHealth);
+
 // ─── Gestion des entreprises ────────────────────────────────────────────────
 // Liste paginée : GET /api/admin/companies?page=1&limit=20&search=acme
 router.get('/companies', adminController.getAllCompanies);
 
 // Détail d'une entreprise (avec ses users et compteurs)
 router.get('/companies/:id', adminController.getCompanyDetails);
+
+// KPI d'une entreprise (vue « Pilotage » côté admin)
+router.get('/companies/:id/kpis', adminController.getCompanyKpis);
 
 // Modifier données générales uniquement (name, address, phone, matriculeFiscale)
 router.put('/companies/:id', adminController.updateCompanyGeneralInfo);

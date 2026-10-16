@@ -9,14 +9,52 @@ const TIMBRE_FISCAL = 1.0;
 const VALID_TVA_RATES = [0, 7, 13, 19];
 const VALID_RS_RATES = [1.0, 5.0, 15.0];
 
+const taxError = (message) => {
+  const err = new Error(message);
+  err.statusCode = 400;
+  return err;
+};
+
+/**
+ * Taux de TVA d'une ligne : absent → 19 % (taux normal), hors barème → erreur.
+ * Un taux inconnu n'est jamais remplacé en silence : le document afficherait
+ * un taux et en calculerait un autre.
+ */
+const resolveTvaRate = (value, label = 'une ligne') => {
+  if (value === null || value === undefined || value === '') return 19;
+  const rate = Number(value);
+  if (!VALID_TVA_RATES.includes(rate)) {
+    throw taxError(
+      `Taux de TVA invalide (${value} %) pour ${label} : taux autorisés ${VALID_TVA_RATES.join(', ')} %`
+    );
+  }
+  return rate;
+};
+
+/** Taux de retenue à la source : doit appartenir au barème */
+const resolveRsRate = (value) => {
+  const rate = Number(value);
+  if (!VALID_RS_RATES.includes(rate)) {
+    throw taxError(
+      `Taux de retenue à la source invalide (${value} %) : taux autorisés ${VALID_RS_RATES.join(', ')} %`
+    );
+  }
+  return rate;
+};
+
 /**
  * Calcule les montants fiscaux à partir des items
- * @param {Array} items - [{unit_price, quantity, tva_rate}]
+ * @param {Array} items - [{unit_price, quantity, tva_rate, name?}]
  * @param {object} options - {is_suspended, apply_rs, rs_rate}
- * @returns {object} {total_ht, tva_breakdown, tva_amount, timbre_fiscal, total_ttc, rs_amount, net_payable}
+ * @returns {object} {total_ht, tva_breakdown, tva_amount, timbre_fiscal, total_ttc,
+ *                    apply_rs, rs_rate, rs_amount, net_payable}
+ * @throws {Error} statusCode 400 si un taux de TVA ou de RS est hors barème
  */
 const calculateTotals = (items = [], options = {}) => {
   const { is_suspended = false, apply_rs = false, rs_rate = 1.0 } = options;
+  // Pas de retenue sur une vente en suspension : le flag stocké suit le calcul
+  const rsApplied = Boolean(apply_rs) && !is_suspended;
+  const rsRate = rsApplied ? resolveRsRate(rs_rate) : Number(rs_rate) || 1.0;
 
   const tvaGroups = {};
   let total_ht = 0;
@@ -24,7 +62,7 @@ const calculateTotals = (items = [], options = {}) => {
   for (const item of items) {
     const qty = Number(item.quantity) || 0;
     const price = Number(item.unit_price) || 0;
-    const rate = VALID_TVA_RATES.includes(Number(item.tva_rate)) ? Number(item.tva_rate) : 19;
+    const rate = resolveTvaRate(item.tva_rate, item.name ? `« ${item.name} »` : undefined);
     // Remise ligne en % (devis) — bornée à [0, 100]
     const discount = Math.min(Math.max(Number(item.discount) || 0, 0), 100);
     const lineHT = parseFloat((price * qty * (1 - discount / 100)).toFixed(3));
@@ -56,12 +94,7 @@ const calculateTotals = (items = [], options = {}) => {
   const timbre_fiscal = is_suspended ? 0 : TIMBRE_FISCAL;
   const total_ttc = parseFloat((total_ht + tva_amount + timbre_fiscal).toFixed(3));
 
-  let rs_amount = 0;
-  if (apply_rs && !is_suspended) {
-    const validRate = VALID_RS_RATES.includes(Number(rs_rate)) ? Number(rs_rate) : 1.0;
-    rs_amount = parseFloat(((total_ttc * validRate) / 100).toFixed(3));
-  }
-
+  const rs_amount = rsApplied ? parseFloat(((total_ttc * rsRate) / 100).toFixed(3)) : 0;
   const net_payable = parseFloat((total_ttc - rs_amount).toFixed(3));
 
   return {
@@ -70,8 +103,36 @@ const calculateTotals = (items = [], options = {}) => {
     tva_amount,
     timbre_fiscal,
     total_ttc,
+    apply_rs: rsApplied,
+    rs_rate: rsRate,
     rs_amount,
     net_payable,
+  };
+};
+
+/**
+ * Montants d'une facture d'avoir totale. L'avoir rembourse HT et TVA mais pas
+ * le timbre (non restituable) ; la retenue de la facture d'origine est annulée
+ * en sens inverse. Invariants respectés : TTC = HT + TVA + timbre, net = TTC − RS.
+ */
+const creditNoteTotals = (original) => {
+  const round = (n) => parseFloat(n.toFixed(3));
+  const total_ht = -Math.abs(original.total_ht || 0);
+  const tva_amount = -Math.abs(original.tva_amount || 0);
+  const total_ttc = round(total_ht + tva_amount);
+  // Anciennes factures : flag RS resté actif en suspension, ou taux hors barème
+  // enregistré alors que le calcul appliquait 1 %
+  const rsApplied = Boolean(original.apply_rs) && !original.is_suspended && Math.abs(original.rs_amount || 0) > 0;
+  const rs_amount = rsApplied ? -Math.abs(original.rs_amount) : 0;
+  return {
+    total_ht,
+    tva_amount,
+    timbre_fiscal: 0,
+    total_ttc,
+    apply_rs: rsApplied,
+    rs_rate: VALID_RS_RATES.includes(Number(original.rs_rate)) ? Number(original.rs_rate) : 1.0,
+    rs_amount,
+    net_payable: round(total_ttc - rs_amount),
   };
 };
 
@@ -198,6 +259,8 @@ const generateReference = (prefix, sequenceNumber) => {
 
 module.exports = {
   calculateTotals,
+  creditNoteTotals,
+  resolveTvaRate,
   amountToWords,
   generateReference,
   TIMBRE_FISCAL,

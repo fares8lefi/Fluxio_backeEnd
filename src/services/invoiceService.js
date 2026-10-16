@@ -3,7 +3,12 @@ const mouvmentRepository = require('../repositories/mouvmentRepository');
 const clientRepository = require('../repositories/clientRepository');
 const companyRepository = require('../repositories/companyRepository');
 const companyService = require('./companyService');
-const { calculateTotals, amountToWords, generateReference } = require('../utils/taxEngine');
+const {
+  calculateTotals,
+  creditNoteTotals,
+  amountToWords,
+  generateReference,
+} = require('../utils/taxEngine');
 const { computeInvoiceReadiness, getCompanyMissingFields } = require('../utils/invoiceReadiness');
 const {
   validateClientRegistration,
@@ -105,7 +110,14 @@ const buildInvoiceCandidate = (movement, company) => {
     total_ht: parseFloat((Number(item.quantity) * Number(item.unit_price) || 0).toFixed(3)),
   }));
 
-  const totals = calculateTotals(items, { is_suspended: false, apply_rs: false });
+  // Un taux hors barème ne doit pas casser toute la liste : la ligne est
+  // signalée par computeInvoiceReadiness et l'aperçu reste vide
+  let totals;
+  try {
+    totals = calculateTotals(items, { is_suspended: false, apply_rs: false });
+  } catch {
+    totals = null;
+  }
   const readiness = computeInvoiceReadiness({
     movement,
     company,
@@ -135,7 +147,7 @@ const buildInvoiceCandidate = (movement, company) => {
     items,
     items_count: items.length,
     total_quantity: items.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0),
-    preview: {
+    preview: totals && {
       ...totals,
       amount_in_words: amountToWords(totals.net_payable),
     },
@@ -221,7 +233,7 @@ const generateInvoiceFromMovement = async (movementId, companyId, options = {}) 
 
   const isSuspended = options.is_suspended === true || options.is_suspended === 'true';
   const applyRs = options.apply_rs === true || options.apply_rs === 'true';
-  const rsRate = parseFloat(options.rs_rate) || 1.0;
+  const rsRate = options.rs_rate ?? 1.0;
 
   if (isSuspended && !options.attestation_ref) {
     throw buildHttpError(
@@ -261,17 +273,19 @@ const generateInvoiceFromMovement = async (movementId, companyId, options = {}) 
 
   // Préparer les items avec tva_rate depuis le produit
   const items = movement.items.map((item) => ({
+    name: item.product?.name,
     unit_price: item.unit_price,
     quantity: item.quantity,
     tva_rate: item.tva_rate ?? item.product?.tva_rate ?? 19,
   }));
 
-  const { total_ht, tva_breakdown, tva_amount, timbre_fiscal, total_ttc, rs_amount, net_payable } =
-    calculateTotals(items, {
-      is_suspended: isSuspended,
-      apply_rs: applyRs,
-      rs_rate: rsRate,
-    });
+  // Lève une erreur 400 si un taux (TVA ou RS) est hors barème ; les valeurs
+  // stockées sont celles réellement appliquées au calcul
+  const totals = calculateTotals(items, {
+    is_suspended: isSuspended,
+    apply_rs: applyRs,
+    rs_rate: rsRate,
+  });
 
   // Rattacher le client choisi au mouvement pour les prochaines générations
   if (clientId && movement.clientId !== clientId) {
@@ -286,15 +300,15 @@ const generateInvoiceFromMovement = async (movementId, companyId, options = {}) 
   return await invoiceRepository.createInvoice({
     reference,
     invoice_type: 'SALE',
-    total_ht,
-    tva_amount,
-    tva_breakdown: JSON.stringify(tva_breakdown),
-    timbre_fiscal,
-    total_ttc,
-    apply_rs: applyRs,
-    rs_rate: rsRate,
-    rs_amount,
-    net_payable,
+    total_ht: totals.total_ht,
+    tva_amount: totals.tva_amount,
+    tva_breakdown: JSON.stringify(totals.tva_breakdown),
+    timbre_fiscal: totals.timbre_fiscal,
+    total_ttc: totals.total_ttc,
+    apply_rs: totals.apply_rs,
+    rs_rate: totals.rs_rate,
+    rs_amount: totals.rs_amount,
+    net_payable: totals.net_payable,
     is_suspended: isSuspended,
     attestation_ref: options.attestation_ref || null,
     purchase_order_ref: options.purchase_order_ref || null,
@@ -342,12 +356,7 @@ const createCreditNote = async (originalInvoiceId, companyId, reason = '') => {
   return await invoiceRepository.createInvoice({
     reference,
     invoice_type: 'CREDIT_NOTE',
-    total_ht: -Math.abs(original.total_ht),
-    tva_amount: -Math.abs(original.tva_amount),
-    timbre_fiscal: 0, // Avoir : pas de timbre fiscal
-    total_ttc: -Math.abs(original.total_ttc),
-    rs_amount: 0,
-    net_payable: -Math.abs(original.net_payable ?? original.total_ttc),
+    ...creditNoteTotals(original),
     tva_breakdown: original.tva_breakdown,
     original_invoice_id: originalInvoiceId,
     notes: reason || `Avoir sur facture ${original.reference}`,

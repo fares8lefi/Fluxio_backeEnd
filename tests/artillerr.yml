@@ -6,5 +6,5 @@ config:
 scenarios:
   - flow:
       - get:
-          url: '/api/users/getAllUsers'
+          url: '/api/users/createUser'
           name: 'Get all users'

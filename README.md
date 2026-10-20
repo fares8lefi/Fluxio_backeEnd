@@ -59,7 +59,7 @@ Create a `.env` file at the project root with at least the following variables:
 PORT=3000
 DATABASE_URL="mysql://root:@localhost:3306/fluxio"
 SESSION_SECRET="your_super_secret_session_key"
-JWT_SECRET="your_super_secret_jwt_key"
+net_Secret="your_super_secret_jwt_key"
 REFRESH_TOKEN_SECRET="your_super_refresh_secret"
 ```
 

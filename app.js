@@ -19,6 +19,7 @@ const prisma = require('./config/db');
 
 const adminRouter = require('./src/routes/adminRouter');
 const { isActiveUser } = require('./src/middlewares/isActiveUser');
+const { originCheck, allowedOrigins } = require('./src/middlewares/originCheck');
 
 const usersRouter = require('./src/routes/usersRouter');
 const categorieRouter = require('./src/routes/categorieRouter');
@@ -48,14 +49,17 @@ app.use(
 app.use(logger('dev'));
 app.use(
   cors({
-    origin: (process.env.FRONTEND_URL || 'http://localhost:5173').split(','),
+    origin: allowedOrigins(),
     credentials: true,
     // Nom de fichier des exports CSV lisible par le navigateur
     exposedHeaders: ['Content-Disposition'],
   })
 );
+// Écritures refusées depuis une origine inconnue (CSRF)
+app.use(originCheck);
+// JSON uniquement : pas de parseur urlencoded, un formulaire d'un autre site
+// ne peut donc pas envoyer de données exploitables (CSRF)
 app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 
 app.use(

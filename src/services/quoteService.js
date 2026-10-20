@@ -1,4 +1,5 @@
 const quoteRepository = require('../repositories/quoteRepository');
+const clientRepository = require('../repositories/clientRepository');
 const { calculateTotals, generateReference } = require('../utils/taxEngine');
 const { computeInvoiceReadiness } = require('../utils/invoiceReadiness');
 const mouvmentService = require('./mouvmentService');
@@ -13,6 +14,10 @@ const httpError = (message, statusCode, extra = {}) => {
 
 const createQuote = async (data, companyId) => {
   const { clientId, items, is_suspended, notes, payment_terms, valid_until } = data;
+  // Le client doit appartenir à l'entreprise (sa fiche est renvoyée avec le devis)
+  if (clientId && !(await clientRepository.getClientByID(clientId, companyId))) {
+    throw httpError('Client introuvable', 404);
+  }
 
   let parsedItems = [];
   if (Array.isArray(items)) {

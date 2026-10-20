@@ -2,6 +2,8 @@
 const prisma = require('../../config/db');
 const mouvmentRepository = require('../repositories/mouvmentRepository');
 const productRepository = require('../repositories/productRepository');
+const clientRepository = require('../repositories/clientRepository');
+const supplierRepository = require('../repositories/supplierRepository');
 const { validateMouvmentRegistration } = require('../validations/mouvmentValidations');
 const { resolveTvaRate } = require('../utils/taxEngine');
 
@@ -39,6 +41,23 @@ const decreaseStock = async (productId, quantity, companyId, tx) => {
     companyId,
     tx
   );
+};
+
+/**
+ * Le client et le fournisseur rattachés doivent appartenir à l'entreprise
+ * (sinon leur fiche d'une autre entreprise serait liée et renvoyée).
+ */
+const assertOwnParties = async ({ clientId, supplierId }, companyId) => {
+  if (clientId && !(await clientRepository.getClientByID(clientId, companyId))) {
+    const error = new Error('Client introuvable');
+    error.statusCode = 404;
+    throw error;
+  }
+  if (supplierId && !(await supplierRepository.findById(supplierId, companyId))) {
+    const error = new Error('Fournisseur introuvable');
+    error.statusCode = 404;
+    throw error;
+  }
 };
 
 /**
@@ -86,6 +105,7 @@ const createMouvment = async (data, user, { keepTvaRate = false } = {}) => {
   }
 
   const { type, items, supplierId, clientId, reference, note, status, createdById } = data;
+  await assertOwnParties({ clientId, supplierId }, user.companyId);
   // Facture fournisseur : uniquement pour une entrée de stock
   const supplierInvoice =
     type === 'IN'

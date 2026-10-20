@@ -94,7 +94,7 @@ const createUser = async (data) => {
     throw error;
   }
 
-  const { username, password, phone, email, company_name, matriculeFiscale, role } = data;
+  const { username, password, phone, email, company_name, matriculeFiscale } = data;
 
   const existingUser = await userRepository.findOneByEmail(email);
   if (existingUser) {
@@ -116,7 +116,8 @@ const createUser = async (data) => {
       phone,
       ...otp,
       is_active: false,
-      role: role === 'admin' ? 'admin' : 'user',
+      // Jamais de rôle admin à l'inscription : créé uniquement côté base / script
+      role: 'user',
       companyId: company.id,
     }),
     sendEmailVerificationCode(email, username, otp.code),

@@ -3,8 +3,7 @@ const {
   creditNoteTotals,
   amountToWords,
   generateReference,
-  TIMBRE_FISCAL,
-} = require('../../../src/utils/taxEngine');
+} =require('../../../src/utils/taxEngine');
 
 describe('Tunisian taxEngine Unit Tests', () => {
   describe('calculateTotals', () => {

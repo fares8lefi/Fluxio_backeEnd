@@ -24,6 +24,7 @@ jest.mock('../../../config/db', () => ({
   client: { findMany: jest.fn(), count: jest.fn() },
   supplier: { findMany: jest.fn() },
   quote: { aggregate: jest.fn(), count: jest.fn() },
+  payment: { aggregate: jest.fn(), findMany: jest.fn() },
 }));
 
 const COMPANY = 'company-1';
@@ -50,6 +51,8 @@ const resetPrisma = () => {
   prisma.supplier.findMany.mockResolvedValue([]);
   prisma.quote.aggregate.mockResolvedValue(emptyAggregate);
   prisma.quote.count.mockResolvedValue(0);
+  prisma.payment.aggregate.mockResolvedValue({ _sum: {} });
+  prisma.payment.findMany.mockResolvedValue([]);
   managerService.clearCache();
 };
 
@@ -111,6 +114,39 @@ describe('managerService', () => {
         expect(period.previous.endDate <= period.startDate).toBe(true);
       });
     });
+
+    it('inclut la journée entière du dernier jour d’une période personnalisée (heure de Tunis)', () => {
+      const period = managerService.resolvePeriod({
+        period: 'custom',
+        startDate: '2026-03-01',
+        endDate: '2026-03-31',
+      });
+      // Tunis = UTC+1 : le 1er mars 00 h 00 est le 28 février 23 h 00 UTC
+      expect(period.startDate.toISOString()).toBe('2026-02-28T23:00:00.000Z');
+      expect(period.endDate.toISOString()).toBe('2026-03-31T22:59:59.999Z');
+    });
+
+    it('enchaîne la période précédente sans trou ni chevauchement', () => {
+      ['30d', 'month', 'prev_month', 'year'].forEach((key) => {
+        const period = managerService.resolvePeriod({ period: key });
+        expect(period.previous.endDate.getTime() + 1).toBe(period.startDate.getTime());
+      });
+      const thirty = managerService.resolvePeriod({ period: '30d' });
+      const length = (p) => p.endDate.getTime() - p.startDate.getTime() + 1;
+      expect(length(thirty)).toBe(30 * 86400000);
+      expect(length(thirty.previous)).toBe(length(thirty));
+    });
+
+    it('rattache le 1er du mois à 00 h 30 (Tunis) au nouveau mois', () => {
+      jest.useFakeTimers().setSystemTime(new Date('2026-10-31T23:30:00Z')); // 1er nov. 00 h 30 à Tunis
+      try {
+        const period = managerService.resolvePeriod({ period: 'month' });
+        expect(period.startDate.toISOString()).toBe('2026-10-31T23:00:00.000Z');
+        expect(period.cacheKey).toBe('month:2026-11');
+      } finally {
+        jest.useRealTimers();
+      }
+    });
   });
 
   describe('calculs défensifs', () => {
@@ -124,57 +160,64 @@ describe('managerService', () => {
   });
 
   describe('getManagerKpis', () => {
-    it('devrait distinguer CA facturé et CA encaissé et calculer le recouvrement', async () => {
-      prisma.invoice.aggregate.mockImplementation(async ({ where }) => {
-        // Encaissé : somme des règlements reçus
-        if (where.invoice_type === 'SALE' && where.status?.in?.includes('PAID')) {
-          return { _sum: { amount_paid: 400 } };
+    it('compte les avoirs en déduction, encaisse par date de règlement, encours à ce jour', async () => {
+      prisma.invoice.findMany.mockImplementation(async ({ where }) => {
+        // Factures créditées par un avoir
+        if (where.invoice_type === 'CREDIT_NOTE' && !where.date) {
+          return [{ original_invoice_id: 'inv-creditee' }];
         }
-        // Ouvertes : net à payer − déjà réglé
-        if (where.status?.in?.includes('PENDING'))
-          return { _sum: { net_payable: 600, amount_paid: 0 } };
-        if (where.invoice_type === 'SALE') {
-          return {
-            _sum: {
-              total_ttc: 1000,
-              total_ht: 800,
-              tva_amount: 199,
-              rs_amount: 10,
-              net_payable: 1000,
+        // Lignes des ventes facturées (marge)
+        if (where.invoice_type === 'SALE' && where.movementId) {
+          return [
+            {
+              movement: {
+                items: [
+                  { quantity: 2, unit_price: 100, purchase_price: 60, product: { categoryId: null } },
+                ],
+              },
             },
-          };
+          ];
+        }
+        // Encours : factures ouvertes, toutes dates
+        if (where.status?.in) {
+          return [{ date: new Date('2025-01-10'), clientId: 'c1', total_ttc: 600, net_payable: 600, amount_paid: 0 }];
+        }
+        return [];
+      });
+      prisma.invoice.aggregate.mockImplementation(async ({ where }) => {
+        // Recouvrement des factures de la période (hors créditées)
+        if (where.id?.notIn) return { _sum: { net_payable: 1000, amount_paid: 400 } };
+        // Ventes + avoirs : l'avoir de 60 est déjà en négatif dans la somme
+        if (where.invoice_type?.in) {
+          return { _sum: { total_ttc: 940, total_ht: 750, tva_amount: 189, rs_amount: 10 } };
         }
         return emptyAggregate;
       });
+      prisma.payment.aggregate.mockResolvedValue({ _sum: { amount: 450 } });
       prisma.invoice.count.mockResolvedValue(4);
       prisma.client.count.mockResolvedValue(7);
       prisma.movement.aggregate.mockResolvedValue({ _sum: { total_amount: 1000 } });
       prisma.product.findMany.mockResolvedValue([
-        {
-          id: 'p1',
-          name: 'Clavier',
-          code: 1,
-          stock_quantity: 10,
-          stock_min: 2,
-          stock_max: 50,
-          purchase_price: 30,
-          selling_price: 50,
-          tva_rate: 19,
-          categoryId: null,
-        },
+        { id: 'p1', name: 'Clavier', stock_quantity: 10, purchase_price: 30, selling_price: 50 },
+        { id: 'p2', name: 'Souris', stock_quantity: -3, purchase_price: 10, selling_price: 20 },
       ]);
 
       const result = await managerService.getManagerKpis(COMPANY, { period: 'month' });
 
-      expect(result.kpis.revenue_billed_ttc.value).toBe(1000);
-      expect(result.kpis.revenue_collected.value).toBe(400);
+      expect(result.kpis.revenue_billed_ttc.value).toBe(940);
+      expect(result.kpis.revenue_collected.value).toBe(450);
       expect(result.kpis.collection_rate_pct.value).toBe(40);
-      expect(result.kpis.outstanding_ttc.value).toBe(600);
-      expect(result.kpis.average_basket.value).toBe(250);
+      expect(result.kpis.outstanding_ttc).toEqual({ value: 600, previous: null, delta_pct: null });
+      expect(result.kpis.average_basket.value).toBe(235);
+      expect(result.kpis.margin_estimated.value).toBe(80);
       expect(result.kpis.client_count.value).toBe(7);
+      // Le stock négatif ne retranche rien : 10 × 30
       expect(result.kpis.stock_value_cost.value).toBe(300);
-      expect(result.kpis.margin_estimated_note).toContain('au moment de la vente');
       expect(result.period).toHaveProperty('previousStartDate');
+
+      // La facture créditée est exclue de l'encours et du recouvrement
+      const outstandingCall = prisma.invoice.findMany.mock.calls.find(([a]) => a.where.status?.in);
+      expect(outstandingCall[0].where.id).toEqual({ notIn: ['inv-creditee'] });
     });
 
     it('devrait renvoyer delta_pct null quand la période précédente est vide', async () => {
@@ -188,104 +231,106 @@ describe('managerService', () => {
     const now = new Date();
     const daysAgo = (days) => new Date(now.getTime() - days * 86400000);
 
-    it('devrait ventiler la TVA par taux et calculer l’ageing', async () => {
-      prisma.invoice.findMany.mockImplementation(async ({ where }) => {
-        // Requête principale : aucun filtre invoice_type (tous types confondus)
-        if (!where.invoice_type) {
+    it('retranche les avoirs (négatifs), ventile la TVA et calcule les impayés à ce jour', async () => {
+      prisma.invoice.findMany.mockImplementation(async ({ where, select }) => {
+        if (where.invoice_type === 'CREDIT_NOTE' && !where.date) return [];
+        if (where.status?.in) {
           return [
-            {
-              date: daysAgo(10),
-              status: 'PENDING',
-              invoice_type: 'SALE',
-              is_suspended: false,
-              total_ht: 200,
-              total_ttc: 240,
-              tva_amount: 38,
-              timbre_fiscal: 1,
-              rs_amount: 0,
-              net_payable: 240,
-              tva_breakdown: JSON.stringify([{ rate: 19, base_ht: 200, tva_amount: 38 }]),
-            },
-            {
-              date: daysAgo(90),
-              status: 'PENDING',
-              invoice_type: 'SALE',
-              is_suspended: false,
-              total_ht: 100,
-              total_ttc: 120,
-              tva_amount: 19,
-              timbre_fiscal: 1,
-              rs_amount: 0,
-              net_payable: 120,
-              tva_breakdown: '{invalide',
-            },
-            {
-              date: daysAgo(200),
-              status: 'PENDING',
-              invoice_type: 'SALE',
-              is_suspended: false,
-              total_ht: 300,
-              total_ttc: 300,
-              tva_amount: 0,
-              timbre_fiscal: 0,
-              rs_amount: 0,
-              net_payable: 300,
-              tva_breakdown: null,
-            },
-            {
-              date: daysAgo(5),
-              status: 'PAID',
-              invoice_type: 'SALE',
-              is_suspended: true,
-              total_ht: 500,
-              total_ttc: 500,
-              tva_amount: 0,
-              timbre_fiscal: 0,
-              rs_amount: 0,
-              net_payable: 500,
-              amount_paid: 500,
-              tva_breakdown: null,
-            },
-            {
-              date: daysAgo(15),
-              status: 'PENDING',
-              invoice_type: 'CREDIT_NOTE',
-              is_suspended: false,
-              total_ht: 50,
-              total_ttc: 60,
-              tva_amount: 9.5,
-              timbre_fiscal: 1,
-              rs_amount: 0,
-              net_payable: 60,
-              tva_breakdown: null,
-            },
+            { date: daysAgo(10), clientId: 'c1', total_ttc: 240, net_payable: 240, amount_paid: 0 },
+            { date: daysAgo(90), clientId: 'c1', total_ttc: 120, net_payable: 120, amount_paid: 0 },
+            { date: daysAgo(200), clientId: 'c2', total_ttc: 300, net_payable: 300, amount_paid: 0 },
           ];
         }
-        // série 12 mois
-        return [];
+        // Requête principale (avec ventilation TVA) ; la série 12 mois n'en a pas
+        if (!select?.tva_breakdown) return [];
+        return [
+          {
+            date: daysAgo(10),
+            invoice_type: 'SALE',
+            is_suspended: false,
+            total_ht: 200,
+            total_ttc: 239,
+            tva_amount: 38,
+            timbre_fiscal: 1,
+            rs_amount: 0,
+            net_payable: 239,
+            tva_breakdown: JSON.stringify([{ rate: 19, base_ht: 200, tva_amount: 38 }]),
+          },
+          {
+            date: daysAgo(20),
+            invoice_type: 'SALE',
+            is_suspended: false,
+            total_ht: 100,
+            total_ttc: 121,
+            tva_amount: 19,
+            timbre_fiscal: 1,
+            rs_amount: 0,
+            net_payable: 121,
+            tva_breakdown: '{invalide',
+          },
+          {
+            date: daysAgo(5),
+            invoice_type: 'SALE',
+            is_suspended: true,
+            total_ht: 500,
+            total_ttc: 500,
+            tva_amount: 0,
+            timbre_fiscal: 0,
+            rs_amount: 0,
+            net_payable: 500,
+            tva_breakdown: JSON.stringify([{ rate: 19, base_ht: 500, tva_amount: 0 }]),
+          },
+          {
+            // Avoir tel qu'enregistré : montants négatifs, ventilation en positif
+            date: daysAgo(3),
+            invoice_type: 'CREDIT_NOTE',
+            is_suspended: false,
+            total_ht: -50,
+            total_ttc: -59.5,
+            tva_amount: -9.5,
+            timbre_fiscal: 0,
+            rs_amount: 0,
+            net_payable: -59.5,
+            tva_breakdown: JSON.stringify([{ rate: 19, base_ht: 50, tva_amount: 9.5 }]),
+          },
+        ];
       });
+      prisma.invoice.aggregate.mockResolvedValue({ _sum: { net_payable: 1000, amount_paid: 431 } });
+      prisma.payment.findMany.mockResolvedValue([
+        { date: daysAgo(1), amount: 500 },
+        // Hors période : compte dans la série 12 mois, pas dans l'encaissé
+        { date: new Date(Date.UTC(now.getUTCFullYear() - 1, 5, 15)), amount: 80 },
+      ]);
 
       const result = await managerService.getManagerSales(COMPANY, { period: 'year' });
 
-      expect(result.totals.billed_ttc).toBe(1160);
+      expect(result.totals.billed_ttc).toBe(860);
+      expect(result.totals.credit_notes_ttc).toBe(59.5);
+      expect(result.totals.net_after_credit_notes).toBe(800.5);
       expect(result.totals.collected_ttc).toBe(500);
       expect(result.totals.suspended_ttc).toBe(500);
-      expect(result.totals.credit_notes_ttc).toBe(60);
-      expect(result.totals.net_after_credit_notes).toBe(1100);
-      expect(result.totals.sale_invoice_count).toBe(4);
+      expect(result.totals.sale_invoice_count).toBe(3);
       expect(result.totals.credit_note_count).toBe(1);
 
-      // Ageing : 240 (10 j) < 30 j ; 120 (90 j) + 300 (200 j) > 60 j
-      // (le tva_breakdown corrompu est ignoré sans erreur)
-      expect(result.collection.ageing.lt_30).toBe(240);
-      expect(result.collection.ageing['30_60']).toBe(0);
-      expect(result.collection.ageing.gt_60).toBe(420);
+      // Impayés à ce jour : 240 (10 j) ; 120 (90 j) + 300 (200 j) > 60 j
+      expect(result.collection.ageing).toEqual({ lt_30: 240, '30_60': 0, gt_60: 420 });
       expect(result.collection.outstanding_ttc).toBe(660);
+      expect(result.collection.outstanding_invoice_count).toBe(3);
       expect(result.collection.rate_pct).toBeCloseTo(43.1, 1);
 
-      // tva_breakdown corrompu => aucune exception, ventilation partielle
-      expect(result.tva_by_rate).toEqual([{ rate: 19, base_ht: 200, tva_amount: 38 }]);
+      // 19 % : 200 − 50 (avoir) ; suspension à part ; ventilation corrompue ignorée
+      expect(result.tva_by_rate).toEqual([
+        { rate: 19, suspended: false, base_ht: 150, tva_amount: 28.5 },
+        { rate: null, suspended: true, base_ht: 500, tva_amount: 0 },
+      ]);
       expect(result.trend).toHaveLength(12);
+    });
+
+    it('termine la série 12 mois sur le mois en cours pour l’exercice', async () => {
+      const result = await managerService.getManagerSales(COMPANY, { period: 'year' });
+      const tunisNow = new Date(Date.now() + 3600000);
+      const currentMonth = `${tunisNow.getUTCFullYear()}-${String(tunisNow.getUTCMonth() + 1).padStart(2, '0')}`;
+      expect(result.trend.at(-1).month).toBe(currentMonth);
     });
 
     it('ne doit jamais renvoyer NaN sur une période vide', async () => {
@@ -297,38 +342,39 @@ describe('managerService', () => {
   });
 
   describe('getManagerClients', () => {
-    it('devrait compter les nouveaux clients et la concentration sur le CA réel', async () => {
-      const startOfPeriod = new Date();
-      startOfPeriod.setUTCMonth(startOfPeriod.getUTCMonth(), 1);
-      startOfPeriod.setUTCHours(0, 0, 0, 0);
+    it('compte les nouveaux clients, la concentration et le panier sur tous les clients facturés', async () => {
+      const startOfPeriod = managerService.resolvePeriod({ period: 'year' }).startDate;
 
       prisma.client.count.mockImplementation(async ({ where }) => (where.is_active ? 7 : 10));
       prisma.movement.groupBy.mockResolvedValue([
-        { clientId: 'c1', _min: { created_at: startOfPeriod } }, // nouveau
+        { clientId: 'c1', _min: { created_at: new Date(startOfPeriod.getTime() + 1000) } }, // nouveau
         { clientId: 'c2', _min: { created_at: new Date('2024-01-01') } }, // ancien
       ]);
-      prisma.invoice.aggregate.mockResolvedValue({
-        _sum: { total_ttc: 1200 },
-        _count: { clientId: 4 },
-      });
-      // invoice.groupBy sert deux fois : classement clients (avec `take` + `_count`)
-      // et clients à risque (avec `_min`, sans `take`).
-      prisma.invoice.groupBy.mockImplementation(async ({ take }) => {
-        if (!take) {
-          // Impayés > 60 j : reste à payer = net à payer − déjà réglé (400 − 100)
+      prisma.invoice.findMany.mockImplementation(async ({ where }) => {
+        if (where.status?.in) {
           return [
-            {
-              clientId: 'c2',
-              _sum: { net_payable: 400, amount_paid: 100 },
-              _min: { date: new Date('2025-01-01') },
-            },
+            // > 60 j : reste 400 − 100
+            { date: new Date('2025-01-01'), clientId: 'c2', total_ttc: 400, net_payable: 400, amount_paid: 100 },
+            // Récente : pas à risque
+            { date: new Date(), clientId: 'c3', total_ttc: 50, net_payable: 50, amount_paid: 0 },
           ];
         }
-        return [
-          { clientId: 'c2', _sum: { total_ttc: 300 }, _count: { _all: 3 } },
-          { clientId: 'c3', _sum: { total_ttc: 200 }, _count: { _all: 2 } },
-          { clientId: 'c4', _sum: { total_ttc: 100 }, _count: { _all: 1 } },
-        ];
+        return [];
+      });
+      prisma.invoice.aggregate.mockResolvedValue({ _sum: { total_ttc: 1200 } });
+      prisma.invoice.groupBy.mockImplementation(async (args) => {
+        // Classement (net des avoirs)
+        if (args.orderBy) {
+          return [
+            { clientId: 'c2', _sum: { total_ttc: 300 } },
+            { clientId: 'c3', _sum: { total_ttc: 200 } },
+            { clientId: 'c4', _sum: { total_ttc: 100 } },
+          ];
+        }
+        // Nombre de factures de vente du top
+        if (args._count) return [{ clientId: 'c2', _count: { _all: 3 } }];
+        // Tous les clients facturés de la période : 12, au-delà du top 10
+        return Array.from({ length: 12 }, (_, i) => ({ clientId: `k${i}` }));
       });
       prisma.client.findMany.mockResolvedValue([
         { id: 'c2', name: 'Alpha', matriculeFiscale: 'A1' },
@@ -338,102 +384,73 @@ describe('managerService', () => {
 
       const result = await managerService.getManagerClients(COMPANY, { period: 'year' });
 
-      expect(result.counts.total).toBe(10);
-      expect(result.counts.active).toBe(7);
-      expect(result.counts.inactive).toBe(3);
-      expect(result.counts.new_in_period).toBe(1);
-      // part rapportée au CA facturé de la période (1200), pas au top N
+      expect(result.counts).toEqual({ total: 10, active: 7, inactive: 3, new_in_period: 1 });
       expect(result.top_clients[0].share_pct).toBe(25);
       expect(result.top_clients[0].invoice_count).toBe(3);
       expect(result.concentration.top5_share_pct).toBe(50);
+      expect(result.avg_basket_per_client).toBe(100); // 1200 / 12 clients, pas / 3
+      expect(result.at_risk).toHaveLength(1);
       expect(result.at_risk[0]).toMatchObject({ name: 'Alpha', outstanding_ttc: 300 });
     });
   });
 
   describe('getManagerStock', () => {
-    it('devrait valoriser le stock, calculer couverture, retours et anomalies', async () => {
+    it('valorise le stock sans les négatifs, couverture en valeur, taux de retour séparés', async () => {
       prisma.product.findMany.mockResolvedValue([
-        {
-          id: 'p1',
-          name: 'A',
-          code: 1,
-          stock_quantity: 100,
-          stock_min: 10,
-          stock_max: 200,
-          purchase_price: 10,
-          selling_price: 12,
-          tva_rate: 19,
-          categoryId: 'cat1',
-        },
-        {
-          id: 'p2',
-          name: 'B',
-          code: 2,
-          stock_quantity: 0,
-          stock_min: 5,
-          stock_max: 50,
-          purchase_price: 20,
-          selling_price: 19,
-          tva_rate: 19,
-          categoryId: 'cat1',
-        },
-        {
-          id: 'p3',
-          name: 'C',
-          code: 3,
-          stock_quantity: -2,
-          stock_min: 5,
-          stock_max: 50,
-          purchase_price: 5,
-          selling_price: 8,
-          tva_rate: 19,
-          categoryId: 'cat2',
-        },
+        { id: 'p1', name: 'A', code: 1, stock_quantity: 100, stock_min: 10, stock_max: 200, purchase_price: 10, selling_price: 12, categoryId: 'cat1' },
+        { id: 'p2', name: 'B', code: 2, stock_quantity: 0, stock_min: 5, stock_max: 50, purchase_price: 20, selling_price: 19, categoryId: 'cat1' },
+        { id: 'p3', name: 'C', code: 3, stock_quantity: -2, stock_min: 5, stock_max: 50, purchase_price: 5, selling_price: 8, categoryId: 'cat2' },
       ]);
       prisma.category.findMany.mockResolvedValue([
         { id: 'cat1', name: 'Boissons' },
         { id: 'cat2', name: 'Divers' },
       ]);
-      prisma.movementItem.aggregate.mockResolvedValue({ _sum: { quantity: 30 } }); // 1/jour
-      prisma.movementItem.findMany.mockResolvedValue([
-        { quantity: 2, unit_price: 100, product: { purchase_price: 60, categoryId: 'cat1' } },
-      ]);
+      // Sorties des 30 derniers jours : 30 × 10 = 300 au coût → 10 par jour
+      prisma.movementItem.findMany.mockResolvedValue([{ quantity: 30, purchase_price: 10 }]);
+      // Ventes facturées de la période : 2 × 100 HT
+      prisma.invoice.findMany.mockImplementation(async ({ where }) =>
+        where.invoice_type === 'SALE' && where.movementId
+          ? [{ movement: { items: [{ quantity: 2, unit_price: 100, purchase_price: 60, product: { categoryId: 'cat1' } }] } }]
+          : []
+      );
       prisma.movement.aggregate.mockImplementation(async ({ where }) => {
         if (where.type === 'IN') return { _sum: { total_amount: 500 }, _count: { _all: 2 } };
-        if (where.type === 'RETURN_SUPPLIER')
-          return { _sum: { total_amount: 20 }, _count: { _all: 1 } };
+        if (where.type === 'RETURN_SUPPLIER') return { _sum: { total_amount: 20 }, _count: { _all: 1 } };
+        if (where.type === 'RETURN_CLIENT') return { _sum: { total_amount: 10 }, _count: { _all: 1 } };
         return { _sum: { total_amount: 0 }, _count: { _all: 0 } };
       });
       prisma.movementItem.groupBy.mockResolvedValue([{ productId: 'p1', _sum: { quantity: 10 } }]);
 
       const result = await managerService.getManagerStock(COMPANY, { period: 'month' });
 
-      expect(result.valuation.cost_value).toBe(990); // 100*10 + 0*20 + (-2)*5
-      expect(result.valuation.sale_value).toBe(1184); // 100*12 + 0*19 + (-2)*8
-      expect(result.valuation.potential_margin).toBe(194);
-      expect(result.coverage_days).toBe(98); // (100 + 0 - 2) / 1
+      expect(result.valuation.cost_value).toBe(1000); // 100 × 10 ; le stock négatif vaut 0
+      expect(result.valuation.sale_value).toBe(1200);
+      expect(result.valuation.potential_margin).toBe(200);
+      expect(result.coverage_days).toBe(100); // 1000 / 10 par jour
       expect(result.purchases.total).toBe(500);
-      expect(result.returns.total).toBe(20);
-      expect(result.anomalies.out_of_stock_count).toBe(2); // p2 (0) et p3 (-2)
-      expect(result.anomalies.below_min_count).toBe(0);
-      expect(result.anomalies.overstock_count).toBe(0);
+      expect(result.returns.total).toBe(30);
+      expect(result.returns.return_rate_pct).toBe(5); // retours clients 10 / ventes 200
+      expect(result.returns.supplier_return_rate_pct).toBe(4); // 20 / achats 500
+      expect(result.anomalies.out_of_stock_count).toBe(2);
       expect(result.anomalies.negative_stock_count).toBe(1);
-      expect(result.anomalies.never_sold_count).toBe(2); // p2 et p3 jamais vendus
-      expect(result.by_category[0].category).toBe('Boissons');
+      expect(result.anomalies.never_sold_count).toBe(2);
+      expect(result.anomalies.never_sold_amount).toBe(0);
+      expect(result.by_category[0]).toMatchObject({ category: 'Boissons', sales_ht: 200, margin: 80 });
       expect(result.low_margin_products[0].name).toBe('B');
     });
   });
 
   describe('getManagerActivity', () => {
-    it('devrait agréger l’activité et la conformité', async () => {
+    it('devrait agréger l’activité et la conformité, hors mouvements annulés', async () => {
       prisma.movement.groupBy.mockResolvedValue([
         { type: 'IN', _count: { _all: 3 } },
         { type: 'OUT', _count: { _all: 5 } },
       ]);
       prisma.movement.count.mockResolvedValue(2);
       prisma.movement.findMany.mockResolvedValue([
-        { created_at: new Date(), total_amount: 100, type: 'OUT' },
+        { created_at: new Date(), total_amount: 100, type: 'IN' },
         { created_at: new Date(), total_amount: 50, type: 'OUT' },
+        { created_at: new Date(), total_amount: 25, type: 'OUT' },
       ]);
       prisma.movementItem.findMany.mockResolvedValue([
         { quantity: 3, unit_price: 10, product: { name: 'Clavier' } },
@@ -449,6 +466,8 @@ describe('managerService', () => {
       expect(result.movements.total).toBe(8);
       expect(result.movements.cancelled).toBe(2);
       expect(result.monthly_activity).toHaveLength(12);
+      expect(result.monthly_activity.at(-1)).toMatchObject({ movements: 3, in_amount: 100, out_amount: 75 });
+      expect(prisma.movement.findMany.mock.calls[0][0].where.status).toEqual({ not: 'CANCELLED' });
       expect(result.top_products[0]).toMatchObject({ name: 'Clavier', revenue_ht: 30 });
       expect(result.quotes.conversion_rate_pct).toBe(25);
       expect(result.compliance.clients_missing_matricule_count).toBe(1);
@@ -515,6 +534,8 @@ describe('managerService', () => {
         ...prisma.invoice.aggregate.mock.calls,
         ...prisma.invoice.count.mock.calls,
         ...prisma.movement.aggregate.mock.calls,
+        ...prisma.invoice.findMany.mock.calls,
+        ...prisma.payment.aggregate.mock.calls,
         ...prisma.movementItem.findMany.mock.calls,
         ...prisma.product.findMany.mock.calls,
         ...prisma.client.count.mock.calls,

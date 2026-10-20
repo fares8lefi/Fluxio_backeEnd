@@ -1,6 +1,7 @@
 const {
   computeInvoiceReadiness,
   getCompanyMissingFields,
+  getClientMissingFields,
 } = require('../../../src/utils/invoiceReadiness');
 
 const fullCompany = {
@@ -153,6 +154,24 @@ describe('invoiceReadiness', () => {
         expect.objectContaining({ scope: 'company', field: 'matriculeFiscale', required: true }),
         expect.objectContaining({ scope: 'company', field: 'address', required: false }),
         expect.objectContaining({ scope: 'company', field: 'phone', required: false }),
+      ]);
+    });
+  });
+
+  describe('getClientMissingFields', () => {
+    it('devrait retourner une liste vide pour un client complet', () => {
+      expect(getClientMissingFields(fullClient)).toEqual([]);
+    });
+
+    it('devrait signaler les champs vides ou blancs du client', () => {
+      expect(getClientMissingFields({ ...fullClient, name: '  ', codeTva: null })).toEqual([
+        expect.objectContaining({
+          scope: 'client',
+          field: 'name',
+          required: true,
+          message: 'Nom du client est obligatoire pour éditer la facture',
+        }),
+        expect.objectContaining({ scope: 'client', field: 'codeTva', required: false }),
       ]);
     });
   });

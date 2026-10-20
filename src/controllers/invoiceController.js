@@ -119,7 +119,7 @@ exports.updateInvoiceStatus = async (req, res) => {
     const updated = await invoiceService.updateInvoiceStatus(invoiceId, status, user.companyId);
     return res.status(200).json({ success: true, message: 'Statut mis à jour', invoice: updated });
   } catch (error) {
-    return res.status(400).json({ success: false, message: error.message });
+    return res.status(error.statusCode || 400).json({ success: false, message: error.message });
   }
 };
 

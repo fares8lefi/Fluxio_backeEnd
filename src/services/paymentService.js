@@ -75,6 +75,15 @@ const addPayment = async (invoiceId, companyId, data = {}) => {
       throw httpError('Seules les factures de vente reçoivent des règlements', 400);
     if (invoice.status === 'CANCELLED')
       throw httpError('Facture annulée : aucun règlement possible', 400);
+    const creditNote = await tx.invoice.findFirst({
+      where: { companyId, original_invoice_id: invoice.id, invoice_type: 'CREDIT_NOTE' },
+      select: { reference: true },
+    });
+    if (creditNote)
+      throw httpError(
+        `Facture créditée par l'avoir ${creditNote.reference} : plus rien n'est dû`,
+        409
+      );
 
     const remaining = round3(amountDue(invoice) - invoice.amount_paid);
     if (remaining <= EPSILON) throw httpError('Cette facture est déjà entièrement réglée', 409);

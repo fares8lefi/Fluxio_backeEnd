@@ -4,6 +4,12 @@ jest.mock('../../../src/repositories/invoiceRepository', () => ({
   getInvoiceByMovementId: jest.fn(),
   getLastReferenceNumber: jest.fn(),
   createInvoice: jest.fn(),
+  getInvoiceById: jest.fn(),
+  findCreditNoteFor: jest.fn(),
+  findCreditNotesFor: jest.fn(),
+  findPaginated: jest.fn(),
+  countAll: jest.fn(),
+  updateStatus: jest.fn(),
 }));
 
 jest.mock('../../../src/repositories/mouvmentRepository', () => ({
@@ -298,6 +304,42 @@ describe('invoiceService', () => {
       await expect(
         invoiceService.generateInvoiceFromMovement('mvt-1', 'company-1', { clientId: 'client-x' })
       ).rejects.toThrow('Client introuvable');
+    });
+  });
+
+  describe('avoirs et annulation', () => {
+    it("refuse d'annuler une facture déjà compensée par un avoir", async () => {
+      invoiceRepository.findCreditNoteFor.mockResolvedValue({ reference: 'AVO-2026-0002' });
+      await expect(
+        invoiceService.updateInvoiceStatus('i1', 'CANCELLED', 'company-1')
+      ).rejects.toMatchObject({ statusCode: 409, message: expect.stringMatching(/AVO-2026-0002/) });
+      expect(invoiceRepository.updateStatus).not.toHaveBeenCalled();
+    });
+
+    it('refuse un avoir sur une facture annulée', async () => {
+      invoiceRepository.getInvoiceById.mockResolvedValue({
+        id: 'i1',
+        reference: 'FAC-2026-0001',
+        invoice_type: 'SALE',
+        status: 'CANCELLED',
+      });
+      await expect(invoiceService.createCreditNote('i1', 'company-1')).rejects.toMatchObject({
+        statusCode: 400,
+      });
+      expect(invoiceRepository.createInvoice).not.toHaveBeenCalled();
+    });
+
+    it("signale dans la liste les factures qui ont reçu un avoir", async () => {
+      invoiceRepository.findPaginated.mockResolvedValue([
+        { id: 'i1', invoice_type: 'SALE' },
+        { id: 'i2', invoice_type: 'SALE' },
+      ]);
+      invoiceRepository.countAll.mockResolvedValue(2);
+      invoiceRepository.findCreditNotesFor.mockResolvedValue([
+        { original_invoice_id: 'i1', reference: 'AVO-2026-0002' },
+      ]);
+      const { invoices } = await invoiceService.getAllInvoices(1, 'company-1');
+      expect(invoices.map((inv) => inv.credit_note_reference)).toEqual(['AVO-2026-0002', null]);
     });
   });
 });

@@ -20,6 +20,12 @@ const invoice = (extra = {}) => ({
   ...extra,
 });
 
+/** La facture chargée ; la recherche d'un avoir sur cette facture renvoie `creditNote` */
+const mockInvoice = (inv, creditNote = null) =>
+  prisma.invoice.findFirst.mockImplementation(async ({ where }) =>
+    where.invoice_type === 'CREDIT_NOTE' ? creditNote : inv
+  );
+
 describe('paymentService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -28,7 +34,7 @@ describe('paymentService', () => {
   });
 
   it('un règlement partiel passe la facture en PARTIALLY_PAID', async () => {
-    prisma.invoice.findFirst.mockResolvedValue(invoice());
+    mockInvoice(invoice());
     const res = await paymentService.addPayment('i1', 'c1', { amount: 400, method: 'cash' });
     expect(prisma.payment.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
@@ -46,7 +52,7 @@ describe('paymentService', () => {
   });
 
   it('le dernier règlement solde la facture (net à payer, retenue déduite)', async () => {
-    prisma.invoice.findFirst.mockResolvedValue(
+    mockInvoice(
       invoice({ amount_paid: 400, status: 'PARTIALLY_PAID' })
     );
     await paymentService.addPayment('i1', 'c1', { amount: 590, method: 'TRANSFER' });
@@ -56,8 +62,16 @@ describe('paymentService', () => {
     });
   });
 
+  it('refuse un règlement sur une facture créditée par un avoir', async () => {
+    mockInvoice(invoice(), { reference: 'AVO-2026-0001' });
+    await expect(
+      paymentService.addPayment('i1', 'c1', { amount: 100, method: 'CASH' })
+    ).rejects.toMatchObject({ statusCode: 409, message: expect.stringMatching(/AVO-2026-0001/) });
+    expect(prisma.payment.create).not.toHaveBeenCalled();
+  });
+
   it('refuse un montant supérieur au reste à payer', async () => {
-    prisma.invoice.findFirst.mockResolvedValue(invoice({ amount_paid: 900 }));
+    mockInvoice(invoice({ amount_paid: 900 }));
     await expect(
       paymentService.addPayment('i1', 'c1', { amount: 100, method: 'CASH' })
     ).rejects.toMatchObject({
@@ -97,7 +111,7 @@ describe('paymentService', () => {
 
   it("la suppression d'un règlement recalcule le statut", async () => {
     prisma.payment.findFirst.mockResolvedValue({ id: 'p2', amount: 590, invoiceId: 'i1' });
-    prisma.invoice.findFirst.mockResolvedValue(invoice({ amount_paid: 990, status: 'PAID' }));
+    mockInvoice(invoice({ amount_paid: 990, status: 'PAID' }));
     await paymentService.deletePayment('p2', 'c1');
     expect(prisma.payment.delete).toHaveBeenCalledWith({ where: { id: 'p2' } });
     expect(prisma.invoice.update).toHaveBeenCalledWith({

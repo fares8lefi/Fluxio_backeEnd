@@ -336,6 +336,11 @@ const createCreditNote = async (originalInvoiceId, companyId, reason = '') => {
     err.statusCode = 400;
     throw err;
   }
+  if (original.status === 'CANCELLED') {
+    const err = new Error('Facture annulée : elle ne compte déjà plus, aucun avoir à émettre');
+    err.statusCode = 400;
+    throw err;
+  }
   // L'avoir reprend la totalité de la facture : un seul avoir par facture
   const existingCreditNote = await invoiceRepository.findCreditNoteFor(
     originalInvoiceId,
@@ -477,7 +482,20 @@ const getAllInvoices = async (page, companyId, filters = {}) => {
   const invoices = await invoiceRepository.findPaginated(numbrePage, limit, companyId, filters);
   const count = await invoiceRepository.countAll(companyId, filters);
 
-  return { invoices, count };
+  // credit_note_reference : la facture a reçu un avoir, elle n'est plus due
+  const credited = await invoiceRepository.findCreditNotesFor(
+    invoices.filter((inv) => inv.invoice_type === 'SALE').map((inv) => inv.id),
+    companyId
+  );
+  const byOriginal = new Map(credited.map((cn) => [cn.original_invoice_id, cn.reference]));
+
+  return {
+    invoices: invoices.map((inv) => ({
+      ...inv,
+      credit_note_reference: byOriginal.get(inv.id) ?? null,
+    })),
+    count,
+  };
 };
 
 const updateInvoiceStatus = async (invoiceId, status, companyId) => {
@@ -487,6 +505,17 @@ const updateInvoiceStatus = async (invoiceId, status, companyId) => {
   }
   if (!['PENDING', 'CANCELLED'].includes(status)) {
     throw new Error('Statut invalide');
+  }
+  if (status === 'CANCELLED') {
+    // Une facture créditée est déjà compensée par son avoir : l'annuler en plus
+    // retirerait deux fois le même montant du chiffre d'affaires
+    const creditNote = await invoiceRepository.findCreditNoteFor(invoiceId, companyId);
+    if (creditNote) {
+      throw buildHttpError(
+        `Cette facture est déjà compensée par l'avoir ${creditNote.reference}`,
+        409
+      );
+    }
   }
   return await invoiceRepository.updateStatus(invoiceId, status, companyId);
 };

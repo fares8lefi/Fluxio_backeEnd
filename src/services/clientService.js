@@ -14,7 +14,8 @@ const createClient = async (client, companyId) => {
     error.details = validationResult.errors;
     throw error;
   }
-  return clientRepository.addClient({ ...client, companyId });
+  // Uniquement les champs validés : companyId, relations… envoyés par le client sont ignorés
+  return clientRepository.addClient({ ...validationResult.data, companyId });
 };
 
 // Met à jour un client
@@ -34,7 +35,7 @@ const updateClient = async (id, data, companyId) => {
     throw error;
   }
 
-  return await clientRepository.updateClient(id, data);
+  return await clientRepository.updateClient(id, validationResult.data);
 };
 
 // Supprime un client

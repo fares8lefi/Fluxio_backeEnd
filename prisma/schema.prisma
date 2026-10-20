@@ -247,9 +247,9 @@ model MovementItem {
 model Client {
   id               String  @id @default(cuid())
   name             String
-  phone            String  @unique
+  phone            String
   // Matricule fiscale tunisien (chaîne alphanumérique, ex: "0123456A/P/M000")
-  matriculeFiscale String  @unique
+  matriculeFiscale String
   // Code TVA : chaîne alphanumérique (pas un Float)
   codeTva          String?
   address          String?
@@ -265,6 +265,11 @@ model Client {
   
   invoices Invoice[]
   quotes   Quote[]
+
+  // Unicité par entreprise (et non globale : une entreprise ne doit pas savoir
+  // quels clients ont les autres, ni être bloquée par eux)
+  @@unique([companyId, phone])
+  @@unique([companyId, matriculeFiscale])
 }
 
 model Invoice {

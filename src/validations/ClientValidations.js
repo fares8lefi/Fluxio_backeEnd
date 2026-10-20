@@ -61,11 +61,12 @@ const clientUpdateSchema = z.object({
 /**
  * Parse a Zod result into the legacy { errors, isValid } format.
  * @param {import('zod').SafeParseReturnType} result
- * @returns {{ errors: Object, isValid: boolean }}
+ * `data` (si valide) ne contient que les champs du schéma : c'est lui qu'il faut enregistrer.
+ * @returns {{ errors: Object, isValid: boolean, data?: Object }}
  */
 const formatResult = (result) => {
   if (result.success) {
-    return { errors: {}, isValid: true };
+    return { errors: {}, isValid: true, data: result.data };
   }
   const errors = {};
   result.error.issues.forEach(({ path, message }) => {

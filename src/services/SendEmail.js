@@ -8,6 +8,12 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+const escapeHtml = (text) =>
+  String(text).replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]
+  );
+
 const htmlTemplate = (username, otpDigits) => `<!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -160,7 +166,7 @@ const htmlTemplate = (username, otpDigits) => `<!DOCTYPE html>
  
       <h1 class="card-title">Vérifiez votre compte</h1>
       <p class="card-subtitle">
-        Bonjour <strong>${username}</strong> <br>
+        Bonjour <strong>${escapeHtml(username)}</strong> <br>
         Entrez le code ci-dessous pour confirmer votre adresse email et activer votre compte Fluxio.
       </p>
  
@@ -269,12 +275,6 @@ const sendEmailResetCode = async (email, username, code) => {
 };
 
 const ROLE_LABELS = { OWNER: 'Gérant', STOCK: 'Magasinier', ACCOUNTANT: 'Comptable' };
-
-const escapeHtml = (text) =>
-  String(text).replace(
-    /[&<>"']/g,
-    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]
-  );
 
 /** Invitation à rejoindre une entreprise sur Fluxio */
 const sendInvitationEmail = async (email, { companyName, inviterName, role, link }) => {

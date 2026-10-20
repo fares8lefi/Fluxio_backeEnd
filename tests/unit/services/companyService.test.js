@@ -2,6 +2,22 @@ jest.mock('../../../src/repositories/companyRepository');
 const companyRepository = require('../../../src/repositories/companyRepository');
 const companyService = require('../../../src/services/companyService');
 
+describe('companyService.getMyCompany', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it("renvoie l'entreprise de l'utilisateur", async () => {
+    companyRepository.findById.mockResolvedValue({ id: 'c1', name: 'Atlas' });
+    await expect(companyService.getMyCompany('c1')).resolves.toEqual({ id: 'c1', name: 'Atlas' });
+    expect(companyRepository.findById).toHaveBeenCalledWith('c1');
+  });
+
+  it('échoue sans companyId ou si elle est introuvable', async () => {
+    await expect(companyService.getMyCompany()).rejects.toThrow('companyId manquant');
+    companyRepository.findById.mockResolvedValue(null);
+    await expect(companyService.getMyCompany('c1')).rejects.toMatchObject({ statusCode: 404 });
+  });
+});
+
 describe('companyService.updateMyCompany', () => {
   beforeEach(() => {
     jest.clearAllMocks();

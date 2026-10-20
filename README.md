@@ -34,16 +34,16 @@ This repository contains the project's **Backend API**, built with Node.js, Expr
 
 ## Tech Stack
 
-| Area            | Technology                                                 |
-| --------------- | ---------------------------------------------------------- |
-| Runtime         | Node.js                                                    |
-| Web Framework   | Express.js                                                 |
-| ORM             | Prisma Client                                              |
-| Database        | MySQL                                                      |
-| Security & Auth | `jsonwebtoken`, `bcrypt`, `helmet`, `express-rate-limit`   |
-| Validation      | `zod`                                                      |
-| Emails          | `nodemailer`                                               |
-| Tests           | `jest`, `artillery` (load tests)                           |
+| Area            | Technology                                               |
+| --------------- | -------------------------------------------------------- |
+| Runtime         | Node.js                                                  |
+| Web Framework   | Express.js                                               |
+| ORM             | Prisma Client                                            |
+| Database        | MySQL                                                    |
+| Security & Auth | `jsonwebtoken`, `bcrypt`, `helmet`, `express-rate-limit` |
+| Validation      | `zod`                                                    |
+| Emails          | `nodemailer`                                             |
+| Tests           | `jest`, `artillery` (load tests)                         |
 
 ## Installation & Getting Started
 
@@ -115,32 +115,32 @@ The API is available at `http://localhost:3000`.
 
 ## Environment Variables
 
-| Variable                                | Required | Description                                                                 |
-| --------------------------------------- | -------- | --------------------------------------------------------------------------- |
-| `DATABASE_URL`                          | yes      | MySQL connection string (`mysql://user:password@host:3306/db`)              |
-| `PORT`                                  | no       | HTTP port (default `3000`)                                                  |
-| `SESSION_SECRET`                        | yes      | Session secret                                                              |
-| `net_Secret`                            | yes      | JWT access token secret (exact name read by the code)                       |
-| `REFRESH_TOKEN_SECRET`                  | yes      | JWT refresh token secret                                                    |
-| `ACCESS_TOKEN_EXPIRY`                   | no       | Access token lifetime (e.g. `15m`)                                          |
-| `REFRESH_TOKEN_EXPIRY`                  | no       | Refresh token lifetime (e.g. `10d`)                                         |
-| `EmailUser` / `EmailPassword`           | yes      | SMTP account used to send OTP and invitation emails                         |
-| `FRONTEND_URL`                          | no       | Allowed frontend origins, comma-separated (default `http://localhost:5173`) |
-| `COOKIE_SAMESITE`                       | no       | `lax` (default) or `none` if the frontend is served from another site       |
-| `TRUST_PROXY`                           | no       | Number of proxies to trust (behind a reverse proxy / Vercel)                |
-| `limitByPage`                           | no       | Page size for paginated lists (default `10`)                                |
-| `MYSQL_ROOT_PASSWORD`, `MYSQL_DATABASE`, `MYSQL_USER`, `MYSQL_PASSWORD` | Docker only | Used by `docker-compose.yml` |
+| Variable                                                                | Required    | Description                                                                 |
+| ----------------------------------------------------------------------- | ----------- | --------------------------------------------------------------------------- |
+| `DATABASE_URL`                                                          | yes         | MySQL connection string (`mysql://user:password@host:3306/db`)              |
+| `PORT`                                                                  | no          | HTTP port (default `3000`)                                                  |
+| `SESSION_SECRET`                                                        | yes         | Session secret                                                              |
+| `net_Secret`                                                            | yes         | JWT access token secret (exact name read by the code)                       |
+| `REFRESH_TOKEN_SECRET`                                                  | yes         | JWT refresh token secret                                                    |
+| `ACCESS_TOKEN_EXPIRY`                                                   | no          | Access token lifetime (e.g. `15m`)                                          |
+| `REFRESH_TOKEN_EXPIRY`                                                  | no          | Refresh token lifetime (e.g. `10d`)                                         |
+| `EmailUser` / `EmailPassword`                                           | yes         | SMTP account used to send OTP and invitation emails                         |
+| `FRONTEND_URL`                                                          | no          | Allowed frontend origins, comma-separated (default `http://localhost:5173`) |
+| `COOKIE_SAMESITE`                                                       | no          | `lax` (default) or `none` if the frontend is served from another site       |
+| `TRUST_PROXY`                                                           | no          | Number of proxies to trust (behind a reverse proxy / Vercel)                |
+| `limitByPage`                                                           | no          | Page size for paginated lists (default `10`)                                |
+| `MYSQL_ROOT_PASSWORD`, `MYSQL_DATABASE`, `MYSQL_USER`, `MYSQL_PASSWORD` | Docker only | Used by `docker-compose.yml`                                                |
 
 ## Scripts
 
-| Command                    | Description                                                                 |
-| -------------------------- | --------------------------------------------------------------------------- |
-| `npm run dev`              | Start the server with Nodemon                                               |
-| `npm start`                | Start the server                                                            |
-| `npm test`                 | Run the Jest test suite                                                     |
-| `npm run e2e`              | Run the Artillery load test (`tests/artillerr.yml`)                         |
-| `npm run lint`             | Lint the code with ESLint                                                   |
-| `npm run format`           | Format the code with Prettier                                               |
+| Command                    | Description                                                                  |
+| -------------------------- | ---------------------------------------------------------------------------- |
+| `npm run dev`              | Start the server with Nodemon                                                |
+| `npm start`                | Start the server                                                             |
+| `npm test`                 | Run the Jest test suite                                                      |
+| `npm run e2e`              | Run the Artillery load test (`tests/artillerr.yml`)                          |
+| `npm run lint`             | Lint the code with ESLint                                                    |
+| `npm run format`           | Format the code with Prettier                                                |
 | `npm run fix:credit-notes` | Dry run of the one-off fix for legacy credit notes and withholding tax rates |
 
 To apply the credit note fix (writes to the database):
@@ -168,23 +168,23 @@ Unit tests live in `tests/unit/` and cover controllers, routes, middlewares, rep
 
 ## API Overview
 
-| Prefix                    | Resource                         |
-| ------------------------- | -------------------------------- |
-| `/api/users`              | Auth, account, OTP               |
-| `/api/company`            | Company profile                  |
-| `/api/team`               | Team members & invitations       |
-| `/api/categories`         | Product categories               |
-| `/api/products`           | Products                         |
-| `/api/suppliers`          | Suppliers                        |
-| `/api/clients`            | Clients                          |
-| `/api/mouvments`          | Stock movements                  |
-| `/api/quotes`             | Quotes                           |
-| `/api/invoices`           | Invoices, payments, credit notes |
-| `/api/dashboard`          | Dashboard                        |
-| `/api/dashboard/manager`  | Manager KPIs                     |
-| `/api/exports`            | CSV exports                      |
-| `/api/admin`              | Platform administration          |
-| `/health`                 | Health check                     |
+| Prefix                   | Resource                         |
+| ------------------------ | -------------------------------- |
+| `/api/users`             | Auth, account, OTP               |
+| `/api/company`           | Company profile                  |
+| `/api/team`              | Team members & invitations       |
+| `/api/categories`        | Product categories               |
+| `/api/products`          | Products                         |
+| `/api/suppliers`         | Suppliers                        |
+| `/api/clients`           | Clients                          |
+| `/api/mouvments`         | Stock movements                  |
+| `/api/quotes`            | Quotes                           |
+| `/api/invoices`          | Invoices, payments, credit notes |
+| `/api/dashboard`         | Dashboard                        |
+| `/api/dashboard/manager` | Manager KPIs                     |
+| `/api/exports`           | CSV exports                      |
+| `/api/admin`             | Platform administration          |
+| `/health`                | Health check                     |
 
 ## Project Architecture
 
@@ -206,13 +206,13 @@ fluxio-backend/
     └── utils/          # Tax engine, invoice readiness, cookie options…
 ```
 
-| Layer               | Role                                                                    |
-| ------------------- | ----------------------------------------------------------------------- |
-| `prisma/`           | Database schema (`schema.prisma`) and migrations                        |
-| `src/routes/`       | API HTTP endpoint definitions                                           |
-| `src/controllers/`  | Receives HTTP requests, delegates to services, and sends responses      |
-| `src/services/`     | Business logic of the application                                       |
-| `src/repositories/` | Data access layer (interacts with Prisma to read/write to DB)           |
-| `src/middlewares/`  | Intermediate functions (JWT verification, roles, CSRF origin check)     |
-| `src/validations/`  | Validation of incoming request structure                                |
-| `src/utils/`        | Shared helpers (tax engine, invoice readiness, cookie options)          |
+| Layer               | Role                                                                |
+| ------------------- | ------------------------------------------------------------------- |
+| `prisma/`           | Database schema (`schema.prisma`) and migrations                    |
+| `src/routes/`       | API HTTP endpoint definitions                                       |
+| `src/controllers/`  | Receives HTTP requests, delegates to services, and sends responses  |
+| `src/services/`     | Business logic of the application                                   |
+| `src/repositories/` | Data access layer (interacts with Prisma to read/write to DB)       |
+| `src/middlewares/`  | Intermediate functions (JWT verification, roles, CSRF origin check) |
+| `src/validations/`  | Validation of incoming request structure                            |
+| `src/utils/`        | Shared helpers (tax engine, invoice readiness, cookie options)      |

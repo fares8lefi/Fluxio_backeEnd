@@ -122,7 +122,8 @@ const creditNoteTotals = (original) => {
   const total_ttc = round(total_ht + tva_amount);
   // Anciennes factures : flag RS resté actif en suspension, ou taux hors barème
   // enregistré alors que le calcul appliquait 1 %
-  const rsApplied = Boolean(original.apply_rs) && !original.is_suspended && Math.abs(original.rs_amount || 0) > 0;
+  const rsApplied =
+    Boolean(original.apply_rs) && !original.is_suspended && Math.abs(original.rs_amount || 0) > 0;
   const rs_amount = rsApplied ? -Math.abs(original.rs_amount) : 0;
   return {
     total_ht,

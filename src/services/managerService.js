@@ -369,7 +369,10 @@ const loadSalesAnalytics = (companyId, from, to, cacheSuffix) =>
   withCache(`salesanalytics:${companyId}:${cacheSuffix}`, async () => {
     const [sales, creditNotes] = await Promise.all([
       prisma.invoice.findMany({
-        where: invoiceRange(companyId, from, to, { invoice_type: 'SALE', movementId: { not: null } }),
+        where: invoiceRange(companyId, from, to, {
+          invoice_type: 'SALE',
+          movementId: { not: null },
+        }),
         select: { movement: { select: { items: { select: ITEM_SELECT } } } },
       }),
       prisma.invoice.findMany({
@@ -620,7 +623,8 @@ const getManagerKpis = async (companyId, query = {}) => {
         invoice_count: withDelta(current.invoice_count, previous.invoice_count),
         average_basket: withDelta(current.average_basket, previous.average_basket),
         margin_estimated: withDelta(current.margin_estimated, previous.margin_estimated),
-        margin_estimated_note: 'Ventes facturées, nettes des avoirs, au prix d’achat du jour de la vente',
+        margin_estimated_note:
+          'Ventes facturées, nettes des avoirs, au prix d’achat du jour de la vente',
         sales_volume: withDelta(current.sales_volume, previous.sales_volume),
         purchase_total: withDelta(current.purchase_total, previous.purchase_total),
         stock_value_cost: { value: stockValueCost, previous: null, delta_pct: null },
@@ -797,7 +801,12 @@ const getManagerSales = async (companyId, query = {}) => {
         collected_ttc: round(collectedTtc),
         rs_amount: round(sum(sales, 'rs_amount')),
         net_payable: round(sum(sales, 'net_payable')),
-        suspended_ttc: round(sum(sales.filter((inv) => inv.is_suspended), 'total_ttc')),
+        suspended_ttc: round(
+          sum(
+            sales.filter((inv) => inv.is_suspended),
+            'total_ttc'
+          )
+        ),
         credit_notes_ttc: round(creditNotesTtc),
         net_after_credit_notes: round(netBilledTtc),
         invoice_count: sales.length,

@@ -52,9 +52,7 @@ describe('paymentService', () => {
   });
 
   it('le dernier règlement solde la facture (net à payer, retenue déduite)', async () => {
-    mockInvoice(
-      invoice({ amount_paid: 400, status: 'PARTIALLY_PAID' })
-    );
+    mockInvoice(invoice({ amount_paid: 400, status: 'PARTIALLY_PAID' }));
     await paymentService.addPayment('i1', 'c1', { amount: 590, method: 'TRANSFER' });
     expect(prisma.invoice.update).toHaveBeenCalledWith({
       where: { id: 'i1' },

@@ -3,7 +3,7 @@ const {
   creditNoteTotals,
   amountToWords,
   generateReference,
-} =require('../../../src/utils/taxEngine');
+} = require('../../../src/utils/taxEngine');
 
 describe('Tunisian taxEngine Unit Tests', () => {
   describe('calculateTotals', () => {
@@ -141,7 +141,7 @@ describe('Tunisian taxEngine Unit Tests', () => {
       );
     });
 
-    it("renvoie le taux de RS réellement appliqué", () => {
+    it('renvoie le taux de RS réellement appliqué', () => {
       const items = [{ unit_price: 1000, quantity: 1, tva_rate: 19 }];
       const result = calculateTotals(items, { apply_rs: true, rs_rate: '5' });
       expect(result).toMatchObject({ apply_rs: true, rs_rate: 5, rs_amount: 59.55 });
@@ -169,17 +169,32 @@ describe('Tunisian taxEngine Unit Tests', () => {
 
     it('rembourse HT et TVA, sans le timbre', () => {
       const cn = creditNoteTotals(original);
-      expect(cn).toMatchObject({ total_ht: -1000, tva_amount: -190, timbre_fiscal: 0, total_ttc: -1190 });
+      expect(cn).toMatchObject({
+        total_ht: -1000,
+        tva_amount: -190,
+        timbre_fiscal: 0,
+        total_ttc: -1190,
+      });
     });
 
     it('annule la retenue en sens inverse : net = TTC − RS', () => {
       const cn = creditNoteTotals(original);
-      expect(cn).toMatchObject({ apply_rs: true, rs_rate: 1, rs_amount: -11.91, net_payable: -1178.09 });
+      expect(cn).toMatchObject({
+        apply_rs: true,
+        rs_rate: 1,
+        rs_amount: -11.91,
+        net_payable: -1178.09,
+      });
       expect(cn.net_payable).toBeCloseTo(cn.total_ttc - cn.rs_amount, 3);
     });
 
     it('sans RS sur la facture, net = TTC', () => {
-      const cn = creditNoteTotals({ ...original, apply_rs: false, rs_amount: 0, net_payable: 1191 });
+      const cn = creditNoteTotals({
+        ...original,
+        apply_rs: false,
+        rs_amount: 0,
+        net_payable: 1191,
+      });
       expect(cn).toMatchObject({ apply_rs: false, rs_amount: 0, net_payable: -1190 });
     });
   });

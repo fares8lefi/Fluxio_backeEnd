@@ -38,12 +38,26 @@ describe('fix-credit-notes', () => {
   });
 
   it('ne touche pas un avoir déjà juste', () => {
-    const fixed = { ...legacyCreditNote, total_ttc: -1190, apply_rs: true, rs_amount: -11.91, net_payable: -1178.09 };
+    const fixed = {
+      ...legacyCreditNote,
+      total_ttc: -1190,
+      apply_rs: true,
+      rs_amount: -11.91,
+      net_payable: -1178.09,
+    };
     expect(planCreditNoteFix(fixed, original)).toBeNull();
   });
 
   it("n'active pas la RS si la facture d'origine était en suspension", () => {
-    const suspended = { ...original, is_suspended: true, tva_amount: 0, timbre_fiscal: 0, total_ttc: 1000, rs_amount: 0, net_payable: 1000 };
+    const suspended = {
+      ...original,
+      is_suspended: true,
+      tva_amount: 0,
+      timbre_fiscal: 0,
+      total_ttc: 1000,
+      rs_amount: 0,
+      net_payable: 1000,
+    };
     const cn = { ...legacyCreditNote, tva_amount: 0, total_ttc: -1000, net_payable: -1000 };
     expect(planCreditNoteFix(cn, suspended)).toBeNull();
   });

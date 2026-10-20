@@ -329,7 +329,7 @@ describe('invoiceService', () => {
       expect(invoiceRepository.createInvoice).not.toHaveBeenCalled();
     });
 
-    it("signale dans la liste les factures qui ont reçu un avoir", async () => {
+    it('signale dans la liste les factures qui ont reçu un avoir', async () => {
       invoiceRepository.findPaginated.mockResolvedValue([
         { id: 'i1', invoice_type: 'SALE' },
         { id: 'i2', invoice_type: 'SALE' },

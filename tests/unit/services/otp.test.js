@@ -7,9 +7,13 @@ jest.mock('../../../config/db', () => ({
 }));
 jest.mock('../../../src/services/SendEmail', () => ({
   sendEmailVerificationCode: jest.fn().mockResolvedValue(),
+  sendAdminVerificationCode: jest.fn().mockResolvedValue(),
   sendEmailResetCode: jest.fn().mockResolvedValue(),
 }));
-const { sendEmailVerificationCode } = require('../../../src/services/SendEmail');
+const {
+  sendEmailVerificationCode,
+  sendAdminVerificationCode,
+} = require('../../../src/services/SendEmail');
 
 const future = () => new Date(Date.now() + 5 * 60 * 1000);
 const pendingUser = (extra = {}) => ({
@@ -35,6 +39,15 @@ describe('Codes OTP', () => {
     expect(String(data.code)).toMatch(/^\d{6}$/);
     expect(data.code_attempts).toBe(0);
     expect(sendEmailVerificationCode).toHaveBeenCalledWith('a@b.tn', 'demo', data.code);
+    expect(sendAdminVerificationCode).not.toHaveBeenCalled();
+  });
+
+  it('renvoie le gabarit administrateur à un compte admin', async () => {
+    prisma.user.findUnique.mockResolvedValue(pendingUser({ role: 'admin' }));
+    await userService.resendCode('a@b.tn');
+    const data = prisma.user.update.mock.calls[0][0].data;
+    expect(sendAdminVerificationCode).toHaveBeenCalledWith('a@b.tn', 'demo', data.code);
+    expect(sendEmailVerificationCode).not.toHaveBeenCalled();
   });
 
   it('active le compte avec le bon code', async () => {
@@ -42,6 +55,7 @@ describe('Codes OTP', () => {
     await userService.verifyAccounts('a@b.tn', '482913');
     expect(prisma.user.update.mock.calls[0][0].data).toMatchObject({
       is_active: true,
+      email_verified: true,
       code: null,
       code_attempts: 0,
     });
@@ -81,5 +95,29 @@ describe('Codes OTP', () => {
       pendingUser({ code_expires_at: new Date(Date.now() - 1000) })
     );
     await expect(userService.verifyAccounts('a@b.tn', '482913')).rejects.toThrow(/expiré/);
+  });
+
+  describe('compte déjà vérifié (suspendu)', () => {
+    const suspended = () =>
+      pendingUser({ is_active: false, email_verified: true, code: null, code_expires_at: null });
+
+    it('refuse de renvoyer un code', async () => {
+      prisma.user.findUnique.mockResolvedValue(suspended());
+      await expect(userService.resendCode('a@b.tn')).rejects.toMatchObject({ statusCode: 409 });
+      expect(prisma.user.update).not.toHaveBeenCalled();
+      expect(sendEmailVerificationCode).not.toHaveBeenCalled();
+    });
+
+    it('refuse de réactiver le compte, même avec un code valide', async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        ...suspended(),
+        code: 482913,
+        code_expires_at: future(),
+      });
+      await expect(userService.verifyAccounts('a@b.tn', '482913')).rejects.toMatchObject({
+        statusCode: 409,
+      });
+      expect(prisma.user.update).not.toHaveBeenCalled();
+    });
   });
 });

@@ -53,8 +53,8 @@ const logo = () => {
 </a>`;
 };
 
-/** Gabarit commun : fond papier, logo, feuille blanche, pied de page. */
-const layout = ({ title, preheader, body, reason }) => `<!DOCTYPE html>
+/** Gabarit commun : fond papier, logo, feuille blanche (bandeau facultatif), pied de page. */
+const layout = ({ title, preheader, body, reason, banner = '' }) => `<!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
@@ -70,6 +70,7 @@ const layout = ({ title, preheader, body, reason }) => `<!DOCTYPE html>
     .fx-sheet-pad { padding: 28px 22px !important; }
     .fx-title { font-size: 23px !important; }
     .fx-digit { width: 40px !important; height: 52px !important; font-size: 26px !important; }
+    .fx-banner-pad { padding: 18px 22px !important; }
   }
   @media (prefers-color-scheme: dark) {
     .fx-bg { background: #0b1a1e !important; }
@@ -81,6 +82,7 @@ const layout = ({ title, preheader, body, reason }) => `<!DOCTYPE html>
     .fx-rule { border-color: #36464a !important; }
     .fx-link { color: #72c2c8 !important; }
     .fx-bar { background: #72c2c8 !important; }
+    .fx-admin-banner { background: #061114 !important; }
   }
 </style>
 </head>
@@ -92,6 +94,7 @@ const layout = ({ title, preheader, body, reason }) => `<!DOCTYPE html>
       <tr><td style="padding:0 4px 20px;">${logo()}</td></tr>
       <tr><td class="fx-sheet" style="background:${C.sheet};border:1px solid ${C.border};border-radius:14px;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+          ${banner}
           <tr><td class="fx-sheet-pad" style="padding:40px 44px;font-family:${FONT};">
             ${body}
           </td></tr>
@@ -211,6 +214,109 @@ const invitationHtml = ({ companyName, inviterName, roleLabel, link }) =>
     ].join('\n'),
   });
 
+// ─── Comptes administrateurs ────────────────────────────────────────────────
+// Même socle que les autres emails, mais une identité « console » distincte :
+// bandeau encre profonde marqué en ambre, code sur fond sombre, rappel du périmètre
+// de l'accès. Un admin reconnaît ainsi au premier coup d'œil un email à fort enjeu.
+
+const adminBanner = () =>
+  `<tr><td class="fx-admin-banner fx-banner-pad" style="background:${C.inkDeep};border-radius:13px 13px 0 0;padding:18px 44px;font-family:${FONT};">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+    <td valign="middle" style="padding:0 10px 0 0;"><div style="width:8px;height:8px;background:${C.amber};border-radius:50%;font-size:0;line-height:0;">&nbsp;</div></td>
+    <td valign="middle" style="font-family:${FONT};${EXPANDED}font-size:11px;line-height:1;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;color:#f4f6f6;">Console d'administration</td>
+  </tr></table>
+</td></tr>`;
+
+/** Le code sur une bande encre profonde : chiffres clairs, liseré ambre. */
+const adminCodeBlock = (code) => {
+  const digits = String(code)
+    .split('')
+    .map(
+      (digit) =>
+        `<td style="padding:0 8px 0 0;"><div class="fx-digit otp-digit" style="width:48px;height:60px;line-height:60px;text-align:center;background:#15252a;border:1px solid #36464a;border-radius:8px;font-family:${FONT};${EXPANDED}font-size:30px;font-weight:600;font-variant-numeric:tabular-nums;color:#f4f6f6;">${escapeHtml(digit)}</div></td>`
+    )
+    .join('');
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:28px 0;">
+  <tr><td class="fx-admin-banner" style="background:${C.inkDeep};border-left:4px solid ${C.amber};border-radius:10px;padding:20px 20px 16px;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>${digits}</tr></table>
+    <p style="margin:14px 0 0;font-family:${FONT};font-size:13px;line-height:1;color:#8d9c9f;">Valable 10 minutes · usage unique</p>
+  </td></tr>
+</table>`;
+};
+
+/** Liste à puces carrées pétrole, en tableau pour Outlook. */
+const bulletList = (items) =>
+  `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 4px;">${items
+    .map(
+      (item) => `<tr>
+    <td valign="top" style="padding:8px 10px 0 0;"><div style="width:6px;height:6px;background:${C.petrol};font-size:0;line-height:0;">&nbsp;</div></td>
+    <td class="fx-ink" style="padding:0 0 6px;font-family:${FONT};font-size:14px;line-height:1.6;color:${C.ink};">${item}</td>
+  </tr>`
+    )
+    .join('')}</table>`;
+
+const ADMIN_SCOPE = [
+  'consulter les indicateurs de toute la plateforme ;',
+  'modifier les informations des entreprises inscrites ;',
+  'suspendre ou réactiver entreprises et utilisateurs ;',
+  "créer d'autres administrateurs.",
+];
+
+const adminVerificationHtml = (username, code, createdBy) =>
+  layout({
+    title: 'Activez votre accès administrateur | Fluxio',
+    preheader: `Code d'activation administrateur : ${code}. Valable 10 minutes.`,
+    reason: createdBy
+      ? `Vous recevez cet email car ${escapeHtml(createdBy)} a créé un compte administrateur Fluxio à cette adresse.`
+      : 'Vous recevez cet email car un compte administrateur Fluxio a été créé à cette adresse.',
+    banner: adminBanner(),
+    body: [
+      heading('Activez votre accès administrateur'),
+      paragraph(
+        createdBy
+          ? `Bonjour ${escapeHtml(username)}, <strong>${escapeHtml(createdBy)}</strong> vous a ouvert un accès administrateur à Fluxio. Saisissez ce code dans la console pour l'activer.`
+          : `Bonjour ${escapeHtml(username)}, un accès administrateur à Fluxio vous a été ouvert. Saisissez ce code dans la console pour l'activer.`
+      ),
+      adminCodeBlock(code),
+      paragraph('Une fois activé, cet accès vous permet de :', { spacing: 10 }),
+      bulletList(ADMIN_SCOPE),
+      rule(),
+      paragraph(SECURITY_NOTE, { muted: true, size: 13, spacing: 10 }),
+      paragraph(
+        "Cet accès ne vous concerne pas ? Ignorez cet email et prévenez l'équipe Fluxio : sans ce code, le compte reste inactif.",
+        { muted: true, size: 13 }
+      ),
+    ].join('\n'),
+  });
+
+/** Code d'activation d'un compte administrateur (gabarit « console ») */
+const sendAdminVerificationCode = async (email, username, code, createdBy) => {
+  try {
+    await transporter.sendMail({
+      from: process.env.EmailUser,
+      to: email,
+      subject: `Activation de votre accès administrateur Fluxio : ${code}`,
+      text: `Bonjour ${username},
+
+${createdBy ? `${createdBy} vous a ouvert un accès administrateur à Fluxio.` : 'Un accès administrateur à Fluxio vous a été ouvert.'}
+Saisissez ce code dans la console d'administration pour l'activer : ${code}
+Il est valable 10 minutes.
+
+Une fois activé, cet accès vous permet de :
+${ADMIN_SCOPE.map((item) => `- ${item}`).join('\n')}
+
+${SECURITY_NOTE}
+Cet accès ne vous concerne pas ? Ignorez cet email et prévenez l'équipe Fluxio.
+
+L'équipe Fluxio`,
+      html: adminVerificationHtml(username, code, createdBy),
+    });
+    console.log('Email sent successfully');
+  } catch (error) {
+    console.log(error);
+  }
+};
+
 const sendEmailVerificationCode = async (email, username, code) => {
   try {
     const mailOptions = {
@@ -288,4 +394,9 @@ L'équipe Fluxio`,
   }
 };
 
-module.exports = { sendEmailVerificationCode, sendEmailResetCode, sendInvitationEmail };
+module.exports = {
+  sendEmailVerificationCode,
+  sendAdminVerificationCode,
+  sendEmailResetCode,
+  sendInvitationEmail,
+};

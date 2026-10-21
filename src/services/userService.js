@@ -4,7 +4,11 @@ const companyRepository = require('../repositories/companyRepository');
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
-const { sendEmailVerificationCode, sendEmailResetCode } = require('./SendEmail');
+const {
+  sendEmailVerificationCode,
+  sendAdminVerificationCode,
+  sendEmailResetCode,
+} = require('./SendEmail');
 const {
   validateUserRegistration,
   validateUserUpdate,
@@ -28,6 +32,7 @@ const toPublicUser = (user, companyName) => ({
   companyId: user.companyId ?? null,
   company_name: companyName ?? user.company?.name ?? null,
   status: user.is_active,
+  email_verified: user.email_verified,
 });
 
 // ── Codes OTP ────────────────────────────────────────────────────────────
@@ -124,6 +129,13 @@ const createUser = async (data) => {
   ]);
 };
 
+/** Un compte déjà vérifié n'a rien à activer : s'il est inactif, il a été suspendu */
+const alreadyVerified = () => {
+  const error = new Error('Ce compte est déjà vérifié.');
+  error.statusCode = 409;
+  return error;
+};
+
 const verifyAccounts = async (email, code) => {
   // findOneByEmail returns user without password — we need the full user with code
   const user = await userRepository.findOneByEmailWithPassword(email);
@@ -132,11 +144,13 @@ const verifyAccounts = async (email, code) => {
     error.statusCode = 404;
     throw error;
   }
+  if (user.email_verified) throw alreadyVerified();
 
   await checkOtp(user, code);
 
   await userRepository.update(user.id, {
     is_active: true,
+    email_verified: true,
     code: null,
     code_expires_at: null,
     code_attempts: 0,
@@ -150,11 +164,14 @@ const resendCode = async (email) => {
     error.statusCode = 404;
     throw error;
   }
+  if (user.email_verified) throw alreadyVerified();
 
   const otp = newOtpFields();
   await userRepository.update(user.id, otp);
 
-  await sendEmailVerificationCode(email, user.username, otp.code);
+  // Un administrateur reçoit le gabarit « console », comme à sa création
+  const send = user.role === 'admin' ? sendAdminVerificationCode : sendEmailVerificationCode;
+  await send(email, user.username, otp.code);
 };
 
 /**
@@ -418,6 +435,7 @@ const deleteUser = async (targetId, requesterId) => {
 };
 
 module.exports = {
+  newOtpFields,
   createUser,
   verifyAccounts,
   resendCode,

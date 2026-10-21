@@ -89,6 +89,26 @@ module.exports.toggleUserStatus = async (req, res) => {
   }
 };
 
+// POST /api/admin/admins  { username, email, password, phone? }
+module.exports.createAdmin = async (req, res) => {
+  try {
+    const admin = await adminService.createAdmin(req.body, req.user);
+    return res.status(201).json({
+      success: true,
+      message: `Administrateur créé : un code d'activation a été envoyé à ${admin.email}`,
+      admin,
+    });
+  } catch (error) {
+    const statusCode = error.statusCode || 500;
+    if (statusCode === 500) console.error(error);
+    return res.status(statusCode).json({
+      success: false,
+      message: error.message,
+      ...(error.details && { errors: error.details }),
+    });
+  }
+};
+
 // ─── Indicateurs (KPI) de la plateforme ─────────────────────────────────────
 /** Enveloppe commune : erreurs 4xx remontées, détail technique des 500 masqué */
 const handleKpi = (name, loader) => async (req, res) => {

@@ -37,4 +37,8 @@ router.patch('/companies/:id/status', adminController.toggleCompanyStatus);
 // Activer / Suspendre un utilisateur : { "is_active": false }
 router.patch('/users/:id/status', adminController.toggleUserStatus);
 
+// ─── Gestion des administrateurs ────────────────────────────────────────────
+// Créer un admin : { "username", "email", "password", "phone"? }
+router.post('/admins', adminController.createAdmin);
+
 module.exports = router;

@@ -149,6 +149,7 @@ const acceptInvitation = async ({ token, username, password, phone } = {}) => {
       password,
       phone: phone ? String(phone).trim() : null,
       is_active: true,
+      email_verified: true,
       role: 'user',
       company_role: invitation.company_role,
       companyId: invitation.companyId,

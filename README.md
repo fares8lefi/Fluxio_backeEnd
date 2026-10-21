@@ -153,7 +153,8 @@ node scripts/fix-credit-notes.js --apply
 
 - **CORS** limited to `FRONTEND_URL`, with credentials.
 - **CSRF protection**: write requests (`POST`, `PUT`, `PATCH`, `DELETE`) coming from a browser must have an allowed `Origin` / `Referer`. Only JSON bodies are accepted (no `urlencoded` parser).
-- **No admin at signup**: the `admin` role can never be set through registration.
+- **No admin at signup**: the `admin` role can never be set through registration. Admins are created by an existing admin via `POST /api/admin/admins` (`username`, `email`, `password`, optional `phone`): the account stays inactive until the OTP emailed to it is entered (`PUT /api/users/verifyAccounts`). The very first one is promoted directly in the database (`role = 'admin', is_active = 1, email_verified = 1`).
+- **Suspended accounts stay suspended**: `email_verified` separates an account awaiting its OTP from a suspended one, so `resendCode` / `verifyAccounts` answer 409 for an already verified account instead of reactivating it.
 - **Mass-assignment protection**: only validated fields are saved (e.g. `companyId` sent by the client is ignored).
 - **HTML escaping** of user data in emails.
 - `helmet` headers and rate limiting.

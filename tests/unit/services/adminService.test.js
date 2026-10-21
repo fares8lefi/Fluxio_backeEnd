@@ -1,5 +1,9 @@
 jest.mock('../../../src/repositories/adminRepository');
+jest.mock('../../../src/repositories/userRepository');
+jest.mock('../../../src/services/SendEmail');
+const { sendAdminVerificationCode } = require('../../../src/services/SendEmail');
 const adminRepository = require('../../../src/repositories/adminRepository');
+const userRepository = require('../../../src/repositories/userRepository');
 const adminService = require('../../../src/services/adminService');
 
 describe('adminService', () => {
@@ -77,5 +81,99 @@ describe('adminService', () => {
       is_active: true,
     });
     expect(adminRepository.updateUserActiveStatus).toHaveBeenCalledWith('u1', true);
+  });
+
+  describe('createAdmin', () => {
+    const payload = {
+      username: ' ops ',
+      email: 'Ops@Fluxio.tn',
+      password: 'Sup3rSecret',
+      phone: '+216 20 000 000',
+      role: 'user',
+      companyId: 'c1',
+    };
+
+    it('crée un admin inactif avec code OTP, envoie le code et masque le mot de passe', async () => {
+      userRepository.findOneByEmail.mockResolvedValue(null);
+      userRepository.create.mockResolvedValue({
+        id: 'a1',
+        username: 'ops',
+        email: 'ops@fluxio.tn',
+        password: 'hash',
+        phone: '+216 20 000 000',
+        role: 'admin',
+        is_active: false,
+        code: 123456,
+        created_at: 'now',
+      });
+
+      const admin = await adminService.createAdmin(payload, { username: 'root' });
+
+      expect(userRepository.findOneByEmail).toHaveBeenCalledWith('ops@fluxio.tn');
+      const created = userRepository.create.mock.calls[0][0];
+      expect(created).toEqual({
+        username: 'ops',
+        email: 'ops@fluxio.tn',
+        password: 'Sup3rSecret',
+        phone: '+216 20 000 000',
+        code: expect.any(Number),
+        code_expires_at: expect.any(Date),
+        code_attempts: 0,
+        role: 'admin',
+        is_active: false,
+      });
+      expect(String(created.code)).toMatch(/^\d{6}$/);
+      expect(sendAdminVerificationCode).toHaveBeenCalledWith(
+        'ops@fluxio.tn',
+        'ops',
+        created.code,
+        'root'
+      );
+      expect(admin).not.toHaveProperty('password');
+      expect(admin).not.toHaveProperty('code');
+      expect(admin).toMatchObject({ id: 'a1', role: 'admin', is_active: false });
+    });
+
+    it('refuse des données invalides (400 avec détails)', async () => {
+      await expect(
+        adminService.createAdmin({ username: 'ab', email: 'x', password: '123' })
+      ).rejects.toMatchObject({
+        statusCode: 400,
+        details: {
+          username: expect.any(String),
+          email: expect.any(String),
+          password: expect.any(String),
+        },
+      });
+      await expect(adminService.createAdmin()).rejects.toMatchObject({ statusCode: 400 });
+      expect(userRepository.create).not.toHaveBeenCalled();
+    });
+
+    it('renvoie 409 si l’email est déjà utilisé', async () => {
+      userRepository.findOneByEmail.mockResolvedValue({ id: 'u1' });
+      await expect(adminService.createAdmin(payload)).rejects.toMatchObject({ statusCode: 409 });
+      expect(userRepository.create).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      [['username'], 'username'],
+      [['phone'], 'phone'],
+    ])('traduit la contrainte unique %j en 409', async (target, field) => {
+      userRepository.findOneByEmail.mockResolvedValue(null);
+      userRepository.create.mockRejectedValue(
+        Object.assign(new Error('dup'), { code: 'P2002', meta: { target } })
+      );
+      await expect(adminService.createAdmin(payload)).rejects.toMatchObject({
+        statusCode: 409,
+        details: { [field]: 'Déjà utilisé' },
+      });
+      expect(sendAdminVerificationCode).not.toHaveBeenCalled();
+    });
+
+    it('laisse remonter les autres erreurs', async () => {
+      userRepository.findOneByEmail.mockResolvedValue(null);
+      userRepository.create.mockRejectedValue(new Error('db'));
+      await expect(adminService.createAdmin(payload)).rejects.toThrow('db');
+    });
   });
 });

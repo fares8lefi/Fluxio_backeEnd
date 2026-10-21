@@ -116,6 +116,9 @@ model User {
   code_expires_at DateTime? // Expiration du code OTP — obligatoire pour la sécurité
   code_attempts   Int       @default(0) // Essais OTP échoués — code invalidé au 5e
   is_active       Boolean   @default(false)
+  // Email confirmé par OTP (ou par invitation) : distingue un compte en attente
+  // d'activation d'un compte suspendu, qui ne doit pas pouvoir se réactiver seul
+  email_verified  Boolean   @default(false)
   phone           String?   @unique
   created_at      DateTime  @default(now())
   last_login      DateTime?

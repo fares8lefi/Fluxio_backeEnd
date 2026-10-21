@@ -34,6 +34,31 @@ const userRegistrationSchema = z.object({
     .min(1, 'Tax identification number is required'),
 });
 
+// Compte administrateur créé par un admin : pas d'entreprise rattachée
+const adminCreationSchema = z.object({
+  username: z
+    .string({ required_error: 'Username is required' })
+    .trim()
+    .min(3, 'Username must be at least 3 characters'),
+
+  email: z
+    .string({ required_error: 'Email is required' })
+    .trim()
+    .min(1, 'Email is required')
+    .email('Email is invalid'),
+
+  password: z
+    .string({ required_error: 'Password is required' })
+    .min(1, 'Password is required')
+    .min(8, 'Password must be at least 8 characters'),
+
+  phone: z
+    .string()
+    .trim()
+    .regex(/^\+?[0-9\s\-().]{6,20}$/, 'Phone number is invalid')
+    .optional(),
+});
+
 const userUpdateSchema = z.object({
   email: z.string().trim().email('Email is invalid').optional(),
   phone: z
@@ -91,6 +116,13 @@ const formatResult = (result) => {
 const validateUserRegistration = (data) => formatResult(userRegistrationSchema.safeParse(data));
 
 /**
+ * Validates admin account creation data.
+ * @param {Object} data
+ * @returns {{ errors: Object, isValid: boolean }}
+ */
+const validateAdminCreation = (data) => formatResult(adminCreationSchema.safeParse(data));
+
+/**
  * Validates user update data (all fields optional).
  * @param {Object} data
  * @returns {{ errors: Object, isValid: boolean }}
@@ -113,11 +145,13 @@ const validateLogin = (data) => formatResult(loginSchema.safeParse(data));
 
 module.exports = {
   validateUserRegistration,
+  validateAdminCreation,
   validateUserUpdate,
   validatePassword,
   validateLogin,
   // Expose schemas for reuse / testing
   userRegistrationSchema,
+  adminCreationSchema,
   userUpdateSchema,
   passwordSchema,
   loginSchema,

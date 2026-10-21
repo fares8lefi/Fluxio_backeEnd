@@ -48,6 +48,7 @@ const findById = async (id) => {
       last_login: true,
       companyId: true,
       company_role: true,
+      email_verified: true,
       company: { select: { name: true } },
     },
   });

@@ -146,4 +146,35 @@ describe('adminController', () => {
       expect(managerService.getManagerKpis).toHaveBeenCalledTimes(1);
     });
   });
+
+  it('createAdmin renvoie 201, les erreurs de validation ou 500', async () => {
+    const admin = { id: 'a1', email: 'ops@fluxio.tn', role: 'admin' };
+    adminService.createAdmin.mockResolvedValueOnce(admin);
+    let res = await call('createAdmin', { body: { email: 'ops@fluxio.tn' } });
+    expect(adminService.createAdmin).toHaveBeenCalledWith(
+      { email: 'ops@fluxio.tn' },
+      expect.objectContaining({ id: 'u1' })
+    );
+    expect(res.status).toHaveBeenCalledWith(201);
+    expect(res.json).toHaveBeenCalledWith({
+      success: true,
+      message: "Administrateur créé : un code d'activation a été envoyé à ops@fluxio.tn",
+      admin,
+    });
+
+    adminService.createAdmin.mockRejectedValueOnce(
+      httpError('Validation échouée', 400, { details: { email: 'Email is invalid' } })
+    );
+    res = await call('createAdmin', {});
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      success: false,
+      message: 'Validation échouée',
+      errors: { email: 'Email is invalid' },
+    });
+
+    adminService.createAdmin.mockRejectedValueOnce(new Error('db'));
+    res = await call('createAdmin', {});
+    expect(res.status).toHaveBeenCalledWith(500);
+  });
 });

@@ -4,6 +4,7 @@ jest.mock('nodemailer', () => ({
 }));
 const {
   sendEmailVerificationCode,
+  sendAdminVerificationCode,
   sendEmailResetCode,
   sendInvitationEmail,
 } = require('../../../src/services/SendEmail');
@@ -54,6 +55,35 @@ describe('SendEmail', () => {
       await expect(send('a@b.tn', 'A', 123456)).resolves.toBeUndefined();
     }
   );
+
+  describe('sendAdminVerificationCode', () => {
+    it('utilise le gabarit console : bandeau, code, périmètre et auteur échappé', async () => {
+      await sendAdminVerificationCode('ops@fluxio.tn', 'Ops', 482913, 'Root <Admin>');
+      const mail = mockSendMail.mock.calls[0][0];
+      expect(mail.to).toBe('ops@fluxio.tn');
+      expect(mail.subject).toBe('Activation de votre accès administrateur Fluxio : 482913');
+      expect(mail.text).toContain('Root <Admin> vous a ouvert un accès administrateur');
+      expect(mail.text).toContain('- suspendre ou réactiver entreprises et utilisateurs ;');
+      expect(mail.html).toContain("Console d'administration");
+      expect(mail.html).toContain('Activez votre accès administrateur');
+      expect(mail.html).toContain('Root &lt;Admin&gt;');
+      expect(mail.html).not.toContain('Root <Admin>');
+      const digits = [...mail.html.matchAll(/class="fx-digit otp-digit"[^>]*>(\d)<\/div>/g)];
+      expect(digits.map((m) => m[1]).join('')).toBe('482913');
+    });
+
+    it("reste correct sans auteur et n'échoue pas si l'envoi échoue", async () => {
+      await sendAdminVerificationCode('ops@fluxio.tn', 'Ops', 123456);
+      const mail = mockSendMail.mock.calls[0][0];
+      expect(mail.text).toContain('Un accès administrateur à Fluxio vous a été ouvert.');
+      expect(mail.html).not.toContain('undefined');
+
+      mockSendMail.mockRejectedValue(new Error('SMTP down'));
+      await expect(
+        sendAdminVerificationCode('ops@fluxio.tn', 'Ops', 123456)
+      ).resolves.toBeUndefined();
+    });
+  });
 
   describe('sendInvitationEmail', () => {
     it('traduit le rôle et échappe le HTML', async () => {

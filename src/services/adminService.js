@@ -1,4 +1,8 @@
 const adminRepository = require('../repositories/adminRepository');
+const userRepository = require('../repositories/userRepository');
+const { newOtpFields } = require('./userService');
+const { sendAdminVerificationCode } = require('./SendEmail');
+const { validateAdminCreation } = require('../validations/UserValidations');
 
 /**
  * Stats globales de la plateforme
@@ -69,6 +73,69 @@ const toggleUserStatus = async (id, is_active) => {
   return adminRepository.updateUserActiveStatus(id, is_active);
 };
 
+/**
+ * Créer un compte administrateur (réservé aux admins).
+ * Sans entreprise ; le compte reste inactif jusqu'à la saisie du code OTP envoyé par
+ * email (PUT /api/users/verifyAccounts). L'inscription publique ne peut jamais attribuer
+ * le rôle admin : c'est le seul moyen d'en créer un par l'API.
+ */
+const createAdmin = async (data = {}, createdBy) => {
+  const { errors, isValid } = validateAdminCreation(data);
+  if (!isValid) {
+    const err = new Error('Validation échouée');
+    err.statusCode = 400;
+    err.details = errors;
+    throw err;
+  }
+
+  const email = data.email.trim().toLowerCase();
+  if (await userRepository.findOneByEmail(email)) {
+    const err = new Error('Un compte avec cet email existe déjà.');
+    err.statusCode = 409;
+    throw err;
+  }
+
+  const otp = newOtpFields();
+  let admin;
+  try {
+    admin = await userRepository.create({
+      username: data.username.trim(),
+      email,
+      password: data.password,
+      phone: data.phone ? data.phone.trim() : null,
+      ...otp,
+      role: 'admin',
+      is_active: false,
+    });
+  } catch (error) {
+    if (error.code === 'P2002') {
+      const field = error.meta?.target?.includes?.('username') ? 'username' : 'phone';
+      const err = new Error(
+        field === 'username'
+          ? "Ce nom d'utilisateur est déjà pris"
+          : 'Ce téléphone est déjà utilisé'
+      );
+      err.statusCode = 409;
+      err.details = { [field]: 'Déjà utilisé' };
+      throw err;
+    }
+    throw error;
+  }
+
+  // Envoyé après la création : pas d'email pour un compte refusé (doublon)
+  await sendAdminVerificationCode(email, admin.username, otp.code, createdBy?.username);
+
+  return {
+    id: admin.id,
+    username: admin.username,
+    email: admin.email,
+    phone: admin.phone,
+    role: admin.role,
+    is_active: admin.is_active,
+    created_at: admin.created_at,
+  };
+};
+
 module.exports = {
   getPlatformStats,
   getAllCompanies,
@@ -76,4 +143,5 @@ module.exports = {
   updateCompanyGeneralInfo,
   toggleCompanyStatus,
   toggleUserStatus,
+  createAdmin,
 };

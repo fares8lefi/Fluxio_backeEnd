@@ -126,8 +126,12 @@ const updateUserActiveStatus = async (id, is_active) => {
   });
 };
 
+/** Nombre de comptes administrateurs (0 tant que la plateforme n'est pas initialisée) */
+const countAdmins = async () => prisma.user.count({ where: { role: 'admin' } });
+
 module.exports = {
   getPlatformStats,
+  countAdmins,
   findAllCompanies,
   findCompanyById,
   updateCompanyGeneralInfo,

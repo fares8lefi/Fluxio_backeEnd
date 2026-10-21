@@ -3,8 +3,25 @@ const router = express.Router();
 const adminController = require('../controllers/adminController');
 const { requireAuthUser } = require('../middlewares/authMiddelwares');
 const { isAdmin } = require('../middlewares/isAdminMiddelware');
+const adminRepository = require('../repositories/adminRepository');
 
-// Toutes les routes admin requièrent : être authentifié + avoir le rôle admin
+// Premier admin : tant qu'aucun admin n'existe, la création est ouverte sans token.
+// Dès qu'un admin existe, la route exige à nouveau d'être authentifié en tant qu'admin.
+const firstAdminOrAdmin = async (req, res, next) => {
+  try {
+    if ((await adminRepository.countAdmins()) === 0) return next();
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: false, message: 'Erreur serveur' });
+  }
+  return requireAuthUser(req, res, () => isAdmin(req, res, next));
+};
+
+// ─── Gestion des administrateurs ────────────────────────────────────────────
+// Créer un admin : { "username", "email", "password", "phone"? }
+router.post('/admins', firstAdminOrAdmin, adminController.createAdmin);
+
+// Toutes les autres routes admin requièrent : être authentifié + avoir le rôle admin
 router.use(requireAuthUser, isAdmin);
 
 // ─── Dashboard plateforme ───────────────────────────────────────────────────
@@ -36,9 +53,5 @@ router.patch('/companies/:id/status', adminController.toggleCompanyStatus);
 // ─── Gestion des utilisateurs ───────────────────────────────────────────────
 // Activer / Suspendre un utilisateur : { "is_active": false }
 router.patch('/users/:id/status', adminController.toggleUserStatus);
-
-// ─── Gestion des administrateurs ────────────────────────────────────────────
-// Créer un admin : { "username", "email", "password", "phone"? }
-router.post('/admins', adminController.createAdmin);
 
 module.exports = router;

@@ -15,17 +15,36 @@ describe('SendEmail', () => {
   });
 
   it.each([
-    ['sendEmailVerificationCode', sendEmailVerificationCode, /vérification/],
-    ['sendEmailResetCode', sendEmailResetCode, /réinitialisation/],
-  ])('%s envoie le code chiffre par chiffre', async (_name, send, subject) => {
+    [
+      'sendEmailVerificationCode',
+      sendEmailVerificationCode,
+      /vérification/,
+      'Confirmez votre adresse email',
+    ],
+    [
+      'sendEmailResetCode',
+      sendEmailResetCode,
+      /réinitialisation/,
+      'Réinitialisez votre mot de passe',
+    ],
+  ])('%s envoie le code chiffre par chiffre', async (_name, send, subject, title) => {
     await send('demo@atlas.tn', 'Demo', 482913);
     const mail = mockSendMail.mock.calls[0][0];
     expect(mail.to).toBe('demo@atlas.tn');
     expect(mail.subject).toMatch(subject);
     expect(mail.subject).toContain('482913');
     expect(mail.text).toContain('Demo');
-    expect(mail.html).toContain('<div class="otp-digit accent">4</div>');
-    expect(mail.html.match(/class="otp-digit/g)).toHaveLength(6);
+    expect(mail.text).toContain('482913');
+    expect(mail.html).toContain(title);
+    const digits = [...mail.html.matchAll(/class="fx-digit otp-digit"[^>]*>(\d)<\/div>/g)];
+    expect(digits.map((m) => m[1]).join('')).toBe('482913');
+  });
+
+  it("échappe le nom d'utilisateur dans le HTML", async () => {
+    await sendEmailVerificationCode('a@b.tn', '<b>Ali</b>', 1234);
+    const { html } = mockSendMail.mock.calls[0][0];
+    expect(html).toContain('&lt;b&gt;Ali&lt;/b&gt;');
+    expect(html).not.toContain('<b>Ali</b>');
   });
 
   it.each([sendEmailVerificationCode, sendEmailResetCode])(

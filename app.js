@@ -19,7 +19,7 @@ const prisma = require('./config/db');
 
 const adminRouter = require('./src/routes/adminRouter');
 const { isActiveUser } = require('./src/middlewares/isActiveUser');
-const { originCheck, allowedOrigins } = require('./src/middlewares/originCheck');
+const { originCheck, isAllowedOrigin } = require('./src/middlewares/originCheck');
 
 const usersRouter = require('./src/routes/usersRouter');
 const categorieRouter = require('./src/routes/categorieRouter');
@@ -49,7 +49,7 @@ app.use(
 app.use(logger('dev'));
 app.use(
   cors({
-    origin: allowedOrigins(),
+    origin: (origin, callback) => callback(null, !origin || isAllowedOrigin(origin)),
     credentials: true,
     // Nom de fichier des exports CSV lisible par le navigateur
     exposedHeaders: ['Content-Disposition'],

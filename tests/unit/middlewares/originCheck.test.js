@@ -1,4 +1,8 @@
-const { originCheck, allowedOrigins } = require('../../../src/middlewares/originCheck');
+const {
+  originCheck,
+  allowedOrigins,
+  isAllowedOrigin,
+} = require('../../../src/middlewares/originCheck');
 
 const run = (method, headers = {}) => {
   const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
@@ -28,6 +32,21 @@ describe('originCheck', () => {
     expect(run('POST', { origin: 'https://app.fluxio.tn' }).next).toHaveBeenCalled();
     expect(run('PUT', { referer: 'http://localhost:5173/#/clients' }).next).toHaveBeenCalled();
     expect(run('DELETE').next).toHaveBeenCalled();
+  });
+
+  it('tolère un point final et la casse dans FRONTEND_URL', () => {
+    process.env.FRONTEND_URL = 'https://Fluxio-Rust.vercel.app.';
+    expect(allowedOrigins()).toEqual(['https://fluxio-rust.vercel.app']);
+    expect(isAllowedOrigin('https://fluxio-rust.vercel.app')).toBe(true);
+  });
+
+  it('accepte « * » pour un segment du nom d’hôte (aperçus Vercel)', () => {
+    process.env.FRONTEND_URL = 'https://fluxio-*-team.vercel.app';
+    expect(isAllowedOrigin('https://fluxio-git-main-team.vercel.app')).toBe(true);
+    expect(isAllowedOrigin('https://fluxio-abc123-team.vercel.app')).toBe(true);
+    expect(isAllowedOrigin('https://fluxio-x.evil.com-team.vercel.app')).toBe(false);
+    expect(isAllowedOrigin('https://fluxio-x-team.vercel.app.evil.com')).toBe(false);
+    expect(isAllowedOrigin('http://fluxio-x-team.vercel.app')).toBe(false);
   });
 
   it.each([

@@ -1,0 +1,28 @@
+# Surcharge de production (serveur derrière Caddy, HTTPS automatique).
+# Activée en ajoutant dans le .env du serveur :
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml
+# puis `docker compose up -d --build`.
+services:
+  db:
+    # MySQL n'est pas exposé hors du réseau Docker
+    ports: !reset []
+
+  backend:
+    # API joignable uniquement via Caddy
+    ports: !override
+      - '127.0.0.1:3000:3000'
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+    depends_on:
+      - backend
+
+volumes:
+  caddy_data:

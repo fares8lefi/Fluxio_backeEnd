@@ -125,6 +125,8 @@ The API is available at `http://localhost:3000`.
 | `ACCESS_TOKEN_EXPIRY`                                                   | no          | Access token lifetime (e.g. `15m`)                                          |
 | `REFRESH_TOKEN_EXPIRY`                                                  | no          | Refresh token lifetime (e.g. `10d`)                                         |
 | `EmailUser` / `EmailPassword`                                           | yes         | SMTP account used to send OTP and invitation emails                         |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE`                             | no          | SMTP server of a custom-domain mailbox (default: Gmail); port 465 = SSL, 587 = STARTTLS |
+| `EmailFrom`                                                             | no          | Sender shown to recipients, e.g. `Fluxio <no-reply@domain.com>` (default `EmailUser`) |
 | `FRONTEND_URL`                                                          | no          | Allowed frontend origins, comma-separated (default `http://localhost:5173`) |
 | `COOKIE_SAMESITE`                                                       | no          | `lax` (default) or `none` if the frontend is served from another site       |
 | `TRUST_PROXY`                                                           | no          | Number of proxies to trust (behind a reverse proxy / Vercel)                |

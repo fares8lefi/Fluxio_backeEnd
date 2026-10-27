@@ -1,12 +1,23 @@
 const nodemailer = require('nodemailer');
 
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EmailUser,
-    pass: process.env.EmailPassword,
-  },
-});
+// SMTP_HOST pour une adresse sur le domaine du projet (Zoho, OVH, Hostinger,
+// Microsoft 365…) ; sans lui, on reste sur Gmail.
+const auth = { user: process.env.EmailUser, pass: process.env.EmailPassword };
+const transporter = nodemailer.createTransport(
+  process.env.SMTP_HOST
+    ? {
+        host: process.env.SMTP_HOST,
+        port: Number(process.env.SMTP_PORT) || 465,
+        secure:
+          (process.env.SMTP_SECURE || String((Number(process.env.SMTP_PORT) || 465) === 465)) ===
+          'true',
+        auth,
+      }
+    : { service: 'gmail', auth }
+);
+
+// Expéditeur affiché, ex. « Fluxio <no-reply@mondomaine.com> »
+const sender = () => process.env.EmailFrom || process.env.EmailUser;
 
 const escapeHtml = (text) =>
   String(text).replace(
@@ -293,7 +304,7 @@ const adminVerificationHtml = (username, code, createdBy) =>
 const sendAdminVerificationCode = async (email, username, code, createdBy) => {
   try {
     await transporter.sendMail({
-      from: process.env.EmailUser,
+      from: sender(),
       to: email,
       subject: `Activation de votre accès administrateur Fluxio : ${code}`,
       text: `Bonjour ${username},
@@ -320,7 +331,7 @@ L'équipe Fluxio`,
 const sendEmailVerificationCode = async (email, username, code) => {
   try {
     const mailOptions = {
-      from: process.env.EmailUser,
+      from: sender(),
       to: email,
       subject: `Votre code de vérification Fluxio : ${code}`,
       text: `Bonjour ${username},
@@ -344,7 +355,7 @@ L'équipe Fluxio`,
 const sendEmailResetCode = async (email, username, code) => {
   try {
     const mailOptions = {
-      from: process.env.EmailUser,
+      from: sender(),
       to: email,
       subject: `Votre code de réinitialisation de mot de passe Fluxio : ${code}`,
       text: `Bonjour ${username},
@@ -372,7 +383,7 @@ const sendInvitationEmail = async (email, { companyName, inviterName, role, link
   try {
     const roleLabel = ROLE_LABELS[role] ?? role;
     await transporter.sendMail({
-      from: process.env.EmailUser,
+      from: sender(),
       to: email,
       subject: `${inviterName} vous invite à rejoindre ${companyName} sur Fluxio`,
       text: `Bonjour,
